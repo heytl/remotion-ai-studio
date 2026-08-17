@@ -1,10 +1,17 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
-import Link from 'next/link';
+import { CheckCircle, FloppyDisk, Key, PlugsConnected, Robot, SpeakerHigh, WarningCircle } from '@phosphor-icons/react';
 import { apiGet, apiPost, apiPut } from '@/lib/api';
 import { AppConfig } from '@/lib/types';
-import { Button, ErrorBanner, Field, Spinner } from '@/components/ui';
+import { StudioShell } from '@/components/StudioShell';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { ErrorBanner, PageHeading, Spinner } from '@/components/ui/feedback';
+import { Field } from '@/components/ui/field';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Switch } from '@/components/ui/switch';
 
 export default function SettingsPage() {
   const [config, setConfig] = useState<AppConfig | null>(null);
@@ -14,158 +21,67 @@ export default function SettingsPage() {
   const [testResult, setTestResult] = useState<{ ok: boolean; message: string } | null>(null);
 
   useEffect(() => {
-    apiGet<{ config: AppConfig }>('/api/config')
-      .then((d) => setConfig(d.config))
-      .catch((e) => setError((e as Error).message));
+    apiGet<{ config: AppConfig }>('/api/config').then((d) => setConfig(d.config)).catch((e) => setError((e as Error).message));
   }, []);
 
   const save = async () => {
     if (!config) return;
-    setSaving(true);
-    setError(null);
-    try {
-      const d = await apiPut<{ config: AppConfig }>('/api/config', config);
-      setConfig(d.config);
-      setTestResult(null);
-    } catch (e) {
-      setError((e as Error).message);
-    } finally {
-      setSaving(false);
-    }
+    setSaving(true); setError(null);
+    try { const d = await apiPut<{ config: AppConfig }>('/api/config', config); setConfig(d.config); setTestResult(null); }
+    catch (e) { setError((e as Error).message); }
+    finally { setSaving(false); }
   };
 
   const test = async () => {
     if (!config) return;
-    setTesting(true);
-    setTestResult(null);
-    setError(null);
+    setTesting(true); setTestResult(null); setError(null);
     try {
-      const result = await apiPost<{ ok: boolean; message: string }>('/api/config/test', {
-        baseUrl: config.llm.baseUrl,
-        apiKey: config.llm.apiKey,
-        model: config.llm.model,
-      });
-      setTestResult(result);
-    } catch (e) {
-      setError((e as Error).message);
-    } finally {
-      setTesting(false);
-    }
+      setTestResult(await apiPost<{ ok: boolean; message: string }>('/api/config/test', { baseUrl: config.llm.baseUrl, apiKey: config.llm.apiKey, model: config.llm.model }));
+    } catch (e) { setError((e as Error).message); }
+    finally { setTesting(false); }
   };
 
-  if (!config) {
-    return (
-      <div className="flex h-screen items-center justify-center gap-2 text-slate-400">
-        <Spinner /> 加载配置…
-      </div>
-    );
-  }
+  if (!config) return <StudioShell active="settings"><div className="flex min-h-[60vh] items-center justify-center gap-3 text-sm text-muted-foreground"><Spinner />加载配置…</div></StudioShell>;
 
-  const setLlm = (partial: Partial<AppConfig['llm']>) =>
-    setConfig({ ...config, llm: { ...config.llm, ...partial } });
-  const setTts = (partial: Partial<AppConfig['tts']>) =>
-    setConfig({ ...config, tts: { ...config.tts, ...partial } });
+  const setLlm = (partial: Partial<AppConfig['llm']>) => setConfig({ ...config, llm: { ...config.llm, ...partial } });
+  const setTts = (partial: Partial<AppConfig['tts']>) => setConfig({ ...config, tts: { ...config.tts, ...partial } });
 
   return (
-    <div className="mx-auto max-w-2xl px-4 py-8">
-      <header className="mb-6 flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <Link href="/" className="text-slate-400 hover:text-white">
-            ← 首页
-          </Link>
-          <h1 className="text-xl font-bold text-white">⚙ 设置</h1>
-        </div>
-        <Button variant="primary" loading={saving} onClick={save}>
-          保存配置
-        </Button>
-      </header>
+    <StudioShell active="settings">
+      <PageHeading eyebrow="Workspace configuration" title="系统设置" description="连接你的模型服务与语音引擎。配置只保存在当前工作区。" actions={<Button loading={saving} onClick={save}><FloppyDisk className="h-4 w-4" weight="bold" aria-hidden="true" />保存配置</Button>} />
+      <div className="mt-6"><ErrorBanner message={error} onClose={() => setError(null)} /></div>
 
-      <ErrorBanner message={error} onClose={() => setError(null)} />
+      <div className="mt-6 grid gap-5 xl:grid-cols-[minmax(0,1fr)_360px]">
+        <Card>
+          <CardHeader className="border-b border-border/15">
+            <div className="flex items-start gap-3"><span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl border border-primary/20 bg-primary/10 text-indigo-200"><Robot className="h-5 w-5" weight="fill" aria-hidden="true" /></span><div><CardTitle>大模型服务</CardTitle><CardDescription>兼容 OpenAI Chat Completions 协议，支持 OpenAI、DeepSeek、Qwen、Ollama 等服务。</CardDescription></div></div>
+          </CardHeader>
+          <CardContent className="space-y-5 pt-5 sm:pt-6">
+            <Field label="API Base URL" hint="通常包含 /v1 前缀，具体以服务商文档为准。"><Input value={config.llm.baseUrl} onChange={(e) => setLlm({ baseUrl: e.target.value })} autoComplete="url" /></Field>
+            <Field label="API Key"><Input type="password" value={config.llm.apiKey} onChange={(e) => setLlm({ apiKey: e.target.value })} placeholder="sk-..." autoComplete="off" /></Field>
+            <div className="grid gap-4 sm:grid-cols-2">
+              <Field label="模型名称"><Input value={config.llm.model} onChange={(e) => setLlm({ model: e.target.value })} /></Field>
+              <Field label="温度（0–2）"><Input type="number" step={0.1} min={0} max={2} value={config.llm.temperature} onChange={(e) => setLlm({ temperature: Number(e.target.value) })} /></Field>
+            </div>
+            <div className="flex flex-col gap-3 border-t border-border/15 pt-5 sm:flex-row sm:items-center"><Button variant="outline" loading={testing} onClick={test}><PlugsConnected className="h-4 w-4" aria-hidden="true" />测试连接</Button>{testResult && <div className={`flex items-start gap-2 text-sm ${testResult.ok ? 'text-emerald-200' : 'text-red-200'}`} role="status">{testResult.ok ? <CheckCircle className="mt-0.5 h-4 w-4 shrink-0" weight="fill" /> : <WarningCircle className="mt-0.5 h-4 w-4 shrink-0" weight="fill" />}<span>{testResult.message}</span></div>}</div>
+          </CardContent>
+        </Card>
 
-      <div className="space-y-5">
-        <div className="card space-y-4">
-          <h2 className="text-lg font-semibold text-white">大模型（OpenAI 兼容 Chat Completions）</h2>
-          <p className="text-xs text-slate-500">
-            支持任意 OpenAI 兼容服务（OpenAI / DeepSeek / Moonshot / Qwen / 本地 Ollama 等），修改后无需改代码。
-            也可通过环境变量 LLM_BASE_URL / LLM_API_KEY / LLM_MODEL 注入（优先级更高）。
-          </p>
-          <Field label="API Base URL（含 /v1 前缀，视服务商而定）">
-            <input className="input" value={config.llm.baseUrl} onChange={(e) => setLlm({ baseUrl: e.target.value })} />
-          </Field>
-          <Field label="API Key">
-            <input
-              className="input"
-              type="password"
-              value={config.llm.apiKey}
-              onChange={(e) => setLlm({ apiKey: e.target.value })}
-              placeholder="sk-..."
-            />
-          </Field>
-          <div className="grid grid-cols-2 gap-3">
-            <Field label="模型名称">
-              <input className="input" value={config.llm.model} onChange={(e) => setLlm({ model: e.target.value })} />
-            </Field>
-            <Field label="温度（0-2）">
-              <input
-                className="input"
-                type="number"
-                step={0.1}
-                min={0}
-                max={2}
-                value={config.llm.temperature}
-                onChange={(e) => setLlm({ temperature: Number(e.target.value) })}
-              />
-            </Field>
-          </div>
-          <div className="flex items-center gap-3">
-            <Button loading={testing} onClick={test}>
-              测试连接
-            </Button>
-            {testResult && (
-              <span className={`text-sm ${testResult.ok ? 'text-emerald-300' : 'text-red-300'}`}>
-                {testResult.ok ? '✓ ' : '✗ '}
-                {testResult.message}
-              </span>
-            )}
-          </div>
-        </div>
-
-        <div className="card space-y-4">
-          <div className="flex items-center justify-between">
-            <h2 className="text-lg font-semibold text-white">TTS 语音合成（可选）</h2>
-            <label className="flex cursor-pointer items-center gap-2 text-sm">
-              <input
-                type="checkbox"
-                checked={config.tts.enabled}
-                onChange={(e) => setTts({ enabled: e.target.checked })}
-              />
-              启用
-            </label>
-          </div>
-          <p className="text-xs text-slate-500">
-            基于 OpenAI audio/speech 协议。启用后可在「文稿」步骤为每个场景生成旁白配音并合成进最终视频。
-          </p>
-          <Field label="TTS Base URL">
-            <input className="input" value={config.tts.baseUrl} onChange={(e) => setTts({ baseUrl: e.target.value })} />
-          </Field>
-          <Field label="TTS API Key">
-            <input
-              className="input"
-              type="password"
-              value={config.tts.apiKey}
-              onChange={(e) => setTts({ apiKey: e.target.value })}
-            />
-          </Field>
-          <div className="grid grid-cols-2 gap-3">
-            <Field label="TTS 模型">
-              <input className="input" value={config.tts.model} onChange={(e) => setTts({ model: e.target.value })} />
-            </Field>
-            <Field label="音色">
-              <input className="input" value={config.tts.voice} onChange={(e) => setTts({ voice: e.target.value })} />
-            </Field>
-          </div>
+        <div className="space-y-5">
+          <Card>
+            <CardHeader className="border-b border-border/15">
+              <div className="flex items-center justify-between gap-4"><div className="flex items-center gap-3"><span className="grid h-10 w-10 place-items-center rounded-xl border border-cyan-300/20 bg-cyan-300/10 text-cyan-200"><SpeakerHigh className="h-5 w-5" weight="fill" aria-hidden="true" /></span><div><CardTitle>TTS 语音合成</CardTitle><CardDescription>为场景生成旁白音轨。</CardDescription></div></div><Switch id="tts-enabled" checked={config.tts.enabled} onCheckedChange={(enabled) => setTts({ enabled })} aria-label="启用 TTS 语音合成" /></div>
+            </CardHeader>
+            <CardContent className="space-y-4 pt-5 sm:pt-6">
+              <div className="flex items-center justify-between rounded-xl border border-border/15 bg-background/35 px-3 py-2.5"><Label htmlFor="tts-enabled">启用语音服务</Label><span className={`text-xs font-semibold ${config.tts.enabled ? 'text-emerald-200' : 'text-muted-foreground'}`}>{config.tts.enabled ? '已启用' : '未启用'}</span></div>
+              <Field label="TTS Base URL"><Input value={config.tts.baseUrl} disabled={!config.tts.enabled} onChange={(e) => setTts({ baseUrl: e.target.value })} /></Field>
+              <Field label="TTS API Key"><Input type="password" value={config.tts.apiKey} disabled={!config.tts.enabled} onChange={(e) => setTts({ apiKey: e.target.value })} autoComplete="off" /></Field>
+              <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-1"><Field label="TTS 模型"><Input value={config.tts.model} disabled={!config.tts.enabled} onChange={(e) => setTts({ model: e.target.value })} /></Field><Field label="音色"><Input value={config.tts.voice} disabled={!config.tts.enabled} onChange={(e) => setTts({ voice: e.target.value })} /></Field></div>
+            </CardContent>
+          </Card>
+          <Card className="border-primary/15 bg-primary/[0.045] p-5"><div className="flex gap-3"><Key className="mt-0.5 h-5 w-5 shrink-0 text-indigo-200" weight="fill" aria-hidden="true" /><div><h3 className="text-sm font-semibold">环境变量优先</h3><p className="mt-1 text-xs leading-5 text-muted-foreground">如果配置了 LLM_BASE_URL、LLM_API_KEY 或 LLM_MODEL，运行环境中的值会覆盖此页面。</p></div></div></Card>
         </div>
       </div>
-    </div>
+    </StudioShell>
   );
 }

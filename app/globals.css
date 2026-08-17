@@ -2,58 +2,74 @@
 @tailwind components;
 @tailwind utilities;
 
-:root {
-  color-scheme: dark;
+@layer base {
+  :root {
+    color-scheme: dark;
+    --background: 222 44% 5%;
+    --foreground: 216 45% 98%;
+    --card: 222 44% 10%;
+    --card-foreground: 216 45% 98%;
+    --popover: 222 44% 10%;
+    --popover-foreground: 216 45% 98%;
+    --primary: 233 100% 72%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 220 42% 13%;
+    --secondary-foreground: 216 45% 96%;
+    --muted: 220 34% 16%;
+    --muted-foreground: 216 20% 66%;
+    --accent: 220 38% 16%;
+    --accent-foreground: 216 45% 98%;
+    --destructive: 0 72% 51%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 216 30% 65%;
+    --input: 216 30% 65%;
+    --ring: 186 79% 53%;
+    --radius: 0.9rem;
+  }
+
+  * { @apply border-border; }
+  html { min-width: 320px; background: hsl(var(--background)); }
+  body {
+    min-height: 100vh;
+    overflow-x: hidden;
+    background: radial-gradient(circle at 58% -8%, hsl(var(--primary) / 0.13), transparent 32rem), radial-gradient(circle at 100% 42%, hsl(var(--ring) / 0.06), transparent 25rem), hsl(var(--background));
+    color: hsl(var(--foreground));
+    font-family: Inter, ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+    font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+    text-rendering: optimizeLegibility;
+  }
+  button, a, input, textarea, select { touch-action: manipulation; }
+  ::selection { background: hsl(var(--primary) / 0.35); color: hsl(var(--foreground)); }
 }
 
-html,
-body {
-  height: 100%;
+@layer utilities {
+  .studio-grid {
+    background-image: linear-gradient(hsl(var(--border) / 0.035) 1px, transparent 1px), linear-gradient(90deg, hsl(var(--border) / 0.035) 1px, transparent 1px);
+    background-size: 34px 34px;
+  }
+  .text-gradient {
+    background: linear-gradient(105deg, #ffffff 8%, #b8c0ff 52%, #63e4ee 100%);
+    background-clip: text;
+    color: transparent;
+    -webkit-background-clip: text;
+  }
+  .overflow-wrap-anywhere { overflow-wrap: anywhere; }
+  .glass-panel {
+    background: linear-gradient(145deg, hsl(var(--card) / 0.94), hsl(var(--background) / 0.88));
+    backdrop-filter: blur(20px);
+  }
 }
 
-body {
-  background-color: #0b1020;
-  color: #e2e8f0;
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Microsoft YaHei',
-    sans-serif;
-}
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { border: 3px solid transparent; border-radius: 999px; background: hsl(var(--border) / 0.26); background-clip: padding-box; }
+::-webkit-scrollbar-thumb:hover { background: hsl(var(--border) / 0.4); background-clip: padding-box; }
 
-/* 自定义滚动条 */
-::-webkit-scrollbar {
-  width: 10px;
-  height: 10px;
-}
-::-webkit-scrollbar-track {
-  background: transparent;
-}
-::-webkit-scrollbar-thumb {
-  background: #334155;
-  border-radius: 6px;
-}
-::-webkit-scrollbar-thumb:hover {
-  background: #475569;
-}
-
-@layer components {
-  .card {
-    @apply rounded-xl border border-slate-700/60 bg-panel/80 p-4;
-  }
-  .btn {
-    @apply inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-50;
-  }
-  .btn-primary {
-    @apply btn bg-accent text-white hover:bg-indigo-500;
-  }
-  .btn-secondary {
-    @apply btn border border-slate-600 bg-slate-800 text-slate-200 hover:bg-slate-700;
-  }
-  .btn-ghost {
-    @apply btn text-slate-300 hover:bg-slate-800;
-  }
-  .input {
-    @apply w-full rounded-lg border border-slate-600 bg-slate-900/70 px-3 py-2 text-sm text-slate-100 placeholder-slate-500 outline-none focus:border-accent;
-  }
-  .label {
-    @apply mb-1 block text-xs font-medium text-slate-400;
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    scroll-behavior: auto !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
   }
 }

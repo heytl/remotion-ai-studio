@@ -1,92 +1,59 @@
 'use client';
 
 import React from 'react';
+import { ArrowRight, Clock, Monitor, Palette, UsersThree } from '@phosphor-icons/react';
 import { Project, Requirements } from '@/lib/types';
-import { Button, Field } from './ui';
+import { Badge } from './ui/badge';
+import { Button } from './ui/button';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
+import { PageHeading } from './ui/feedback';
+import { Field } from './ui/field';
+import { Input } from './ui/input';
+import { NativeSelect } from './ui/native-select';
 
-export type Patch = (partial: Partial<Project> | ((p: Project) => Project)) => void;
+export type Patch = (partial: Partial<Project> | ((project: Project) => Project)) => void;
 
 const STYLES = ['科普', '营销', '故事化', '教程', '产品宣传', 'Vlog'];
-const DURATIONS = [
-  { value: 30, label: '30 秒' },
-  { value: 60, label: '1 分钟' },
-  { value: 90, label: '1 分半' },
-  { value: 180, label: '3 分钟' },
-  { value: 300, label: '5 分钟' },
-];
+const DURATIONS = [{ value: 30, label: '30 秒' }, { value: 60, label: '1 分钟' }, { value: 90, label: '1 分半' }, { value: 180, label: '3 分钟' }, { value: 300, label: '5 分钟' }];
 
-export const RequirementsForm: React.FC<{
-  project: Project;
-  patch: Patch;
-  onNext: () => void;
-}> = ({ project, patch, onNext }) => {
-  const r = project.requirements;
-  const set = (partial: Partial<Requirements>) => patch({ requirements: { ...r, ...partial } });
+export const RequirementsForm: React.FC<{ project: Project; patch: Patch; onNext: () => void }> = ({ project, patch, onNext }) => {
+  const requirements = project.requirements;
+  const set = (partial: Partial<Requirements>) => patch({ requirements: { ...requirements, ...partial } });
 
   return (
-    <div className="mx-auto max-w-2xl space-y-5">
-      <div>
-        <h2 className="text-xl font-semibold text-white">步骤 1 · 需求输入</h2>
-        <p className="mt-1 text-sm text-slate-400">填写视频主题与基础参数，后续每一步都可以回来修改。</p>
-      </div>
+    <div className="mx-auto max-w-5xl space-y-6">
+      <PageHeading eyebrow="Step 01 · Creative brief" title="定义这支视频" description="先明确主题、受众和输出格式。后续所有 AI 生成结果都会以这些信息为基础。" />
+      <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_300px]">
+        <Card>
+          <CardHeader className="border-b border-border/15"><CardTitle>创作需求</CardTitle><CardDescription>所有字段都可以在生成后再次调整。</CardDescription></CardHeader>
+          <CardContent className="space-y-5 pt-5 sm:pt-6">
+            <Field label="视频主题" hint="使用一句具体、清晰的话描述内容目标。" required><Input value={requirements.topic} placeholder="例如：3 分钟看懂量子计算" onChange={(e) => set({ topic: e.target.value })} required /></Field>
+            <div className="grid gap-4 sm:grid-cols-2">
+              <Field label="目标时长"><NativeSelect value={requirements.durationSeconds} onChange={(e) => set({ durationSeconds: Number(e.target.value) })}>{DURATIONS.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}</NativeSelect></Field>
+              <Field label="画面比例"><NativeSelect value={requirements.aspectRatio} onChange={(e) => set({ aspectRatio: e.target.value as Requirements['aspectRatio'] })}><option value="16:9">16:9（横屏）</option><option value="9:16">9:16（竖屏）</option><option value="1:1">1:1（方形）</option></NativeSelect></Field>
+              <Field label="视频风格"><NativeSelect value={requirements.style} onChange={(e) => set({ style: e.target.value })}>{STYLES.map((style) => <option key={style}>{style}</option>)}</NativeSelect></Field>
+              <Field label="语言"><Input value={requirements.language} onChange={(e) => set({ language: e.target.value })} /></Field>
+            </div>
+            <Field label="目标受众"><Input value={requirements.audience} placeholder="例如：对科技感兴趣的普通观众" onChange={(e) => set({ audience: e.target.value })} /></Field>
+            <div className="flex justify-end border-t border-border/15 pt-5"><Button disabled={!requirements.topic.trim()} onClick={onNext}>保存并进入大纲<ArrowRight className="h-4 w-4" weight="bold" /></Button></div>
+          </CardContent>
+        </Card>
 
-      <Field label="视频主题 *">
-        <input
-          className="input"
-          value={r.topic}
-          placeholder="例如：什么是量子计算？3 分钟看懂"
-          onChange={(e) => set({ topic: e.target.value })}
-        />
-      </Field>
-
-      <div className="grid grid-cols-2 gap-4">
-        <Field label="目标时长">
-          <select className="input" value={r.durationSeconds} onChange={(e) => set({ durationSeconds: Number(e.target.value) })}>
-            {DURATIONS.map((d) => (
-              <option key={d.value} value={d.value}>
-                {d.label}
-              </option>
-            ))}
-          </select>
-        </Field>
-        <Field label="画面比例">
-          <select className="input" value={r.aspectRatio} onChange={(e) => set({ aspectRatio: e.target.value as Requirements['aspectRatio'] })}>
-            <option value="16:9">16:9（横屏）</option>
-            <option value="9:16">9:16（竖屏）</option>
-            <option value="1:1">1:1（方形）</option>
-          </select>
-        </Field>
-      </div>
-
-      <div className="grid grid-cols-2 gap-4">
-        <Field label="视频风格">
-          <select className="input" value={r.style} onChange={(e) => set({ style: e.target.value })}>
-            {STYLES.map((s) => (
-              <option key={s} value={s}>
-                {s}
-              </option>
-            ))}
-          </select>
-        </Field>
-        <Field label="语言">
-          <input className="input" value={r.language} onChange={(e) => set({ language: e.target.value })} />
-        </Field>
-      </div>
-
-      <Field label="目标受众">
-        <input
-          className="input"
-          value={r.audience}
-          placeholder="例如：对科技感兴趣的普通观众"
-          onChange={(e) => set({ audience: e.target.value })}
-        />
-      </Field>
-
-      <div className="flex justify-end pt-2">
-        <Button variant="primary" disabled={!r.topic.trim()} onClick={onNext}>
-          保存并进入下一步 →
-        </Button>
+        <Card className="h-fit overflow-hidden">
+          <div className="studio-grid border-b border-border/15 bg-primary/[0.05] p-6"><p className="text-[10px] font-bold uppercase tracking-[0.15em] text-muted-foreground">Project signal</p><h3 className="mt-3 text-balance text-xl font-semibold tracking-tight">{requirements.topic || '等待输入视频主题'}</h3></div>
+          <CardContent className="space-y-4 pt-5">
+            <SummaryItem icon={<Clock />} label="时长" value={`${requirements.durationSeconds} 秒`} />
+            <SummaryItem icon={<Monitor />} label="画幅" value={requirements.aspectRatio} />
+            <SummaryItem icon={<Palette />} label="风格" value={requirements.style} />
+            <SummaryItem icon={<UsersThree />} label="受众" value={requirements.audience || '未设置'} />
+            <div className="pt-2"><Badge variant="success"><span className="h-1.5 w-1.5 rounded-full bg-emerald-300" />自动保存已开启</Badge></div>
+          </CardContent>
+        </Card>
       </div>
     </div>
   );
 };
+
+function SummaryItem({ icon, label, value }: { icon: React.ReactElement; label: string; value: string }) {
+  return <div className="flex items-center gap-3"><span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl border border-border/15 bg-secondary/65 text-indigo-200 [&>svg]:h-4 [&>svg]:w-4">{icon}</span><div className="min-w-0"><p className="text-[10px] uppercase tracking-[0.12em] text-muted-foreground">{label}</p><p className="truncate text-sm font-medium text-foreground">{value}</p></div></div>;
+}

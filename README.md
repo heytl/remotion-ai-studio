@@ -28,7 +28,7 @@
 
 - **前端 + 后端**：Next.js 15（App Router，API Routes 同项目承载）
 - **视频框架**：Remotion 4（`remotion` / `@remotion/player` / `@remotion/bundler` / `@remotion/renderer`）
-- **UI**：React 19 + Tailwind CSS 3
+- **UI**：React 19 + Tailwind CSS 3 + shadcn 风格组件（Radix UI 原语）
 - **大模型接入**：OpenAI 兼容 Chat Completions 协议（`fetch` 直连，无厂商锁定）
 - **数据持久化**：本地 JSON 文件（`data/` 目录，无需数据库）
 - **TTS（可选）**：OpenAI `audio/speech` 协议
@@ -59,10 +59,16 @@ remotion-ai-studio/
 ├── remotion/                   # Remotion Composition（Schema 驱动，可复用场景组件）
 │   ├── index.ts / Root.tsx / VideoComposition.tsx
 │   └── scenes/                 # 标题页/要点列表/图文/纯字幕/转场
+├── docs/                       # 项目设计与维护文档
+│   └── UI-DESIGN.md            # Motion Lab UI 设计规范
 ├── data/                       # 运行时数据（gitignore，自动创建）
 ├── Dockerfile / docker-compose.yml
 └── .env.example
 ```
+
+## UI 设计文档
+
+本次重构的视觉方向、设计令牌、基础组件、页面信息架构、响应式与可访问性规则已整理在 [UI 设计规范](docs/UI-DESIGN.md)。后续新增或修改界面，请以该文档和 `components/ui/` 为准，避免引入新的视觉语言。
 
 ## 四、本地运行
 
@@ -168,3 +174,4 @@ docker compose up -d --build
 - [x] 渲染进度反馈（异步队列 + 百分比）
 - [x] 代码结构清晰，含错误处理（LLM 失败、渲染失败、连接测试等）
 - [x] README 完整，按文档可复现
+- [x] 统一的 shadcn + Tailwind UI 设计系统，并提供维护规范
