@@ -1,7 +1,7 @@
 services:
-  ai-video:
+  remotion-ai-studio:
     build: .
-    container_name: ai-video-generator
+    container_name: remotion-ai-studio
     ports:
       - "3000:3000"
     environment:
@@ -18,8 +18,8 @@ services:
       TTS_MODEL: ${TTS_MODEL:-tts-1}
       TTS_VOICE: ${TTS_VOICE:-alloy}
     volumes:
-      - ai-video-data:/app/data
+      - remotion-ai-studio-data:/app/data
     restart: unless-stopped
 
 volumes:
-  ai-video-data:
+  remotion-ai-studio-data:

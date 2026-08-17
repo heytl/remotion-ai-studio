@@ -1,4 +1,6 @@
-# 🎬 AI 视频生成器（基于 Remotion）
+# 🎬 Remotion AI Studio — 基于 Remotion 的 AI 视频生成器
+
+> 项目名：**remotion-ai-studio**
 
 一个可本地运行、可 Docker 部署的 AI 视频生成 Web 应用。用户输入主题/需求后，系统通过大模型自动完成：
 
@@ -34,7 +36,7 @@
 ## 三、目录结构
 
 ```
-ai-video-generator-pi/
+remotion-ai-studio/
 ├── app/                        # Next.js App Router
 │   ├── page.tsx                # 首页：新建项目 + 项目列表
 │   ├── settings/page.tsx       # 设置：大模型 / TTS 配置 + 连接测试
@@ -111,7 +113,7 @@ docker compose up -d --build
 
 启动后访问 **http://localhost:3000**（容器端口 3000 映射到宿主机 3000，可在 `docker-compose.yml` 修改）。
 
-- 数据（项目 / 渲染任务 / MP4）持久化在命名卷 `ai-video-data`（容器内 `/app/data`）。
+- 数据（项目 / 渲染任务 / MP4）持久化在命名卷 `remotion-ai-studio-data`（容器内 `/app/data`）。
 - 首次渲染会自动打包 Remotion Composition，耗时稍长，之后复用缓存。
 - 镜像已内置 Chrome Headless Shell 所需系统库与 Noto CJK 中文字体。
 

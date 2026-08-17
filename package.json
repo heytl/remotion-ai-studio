@@ -1,5 +1,5 @@
 {
-  "name": "ai-video-generator",
+  "name": "remotion-ai-studio",
   "version": "1.0.0",
   "private": true,
   "description": "基于 Remotion 的 AI 视频生成网站：需求 → 大纲 → 文稿 → Remotion 预览 → 导出 MP4",
