@@ -1,7 +1,7 @@
 'use client';
 
 import * as React from 'react';
-import { CircleNotch, WarningCircle, X } from '@phosphor-icons/react';
+import { CheckCircle, CircleNotch, WarningCircle, X } from '@phosphor-icons/react';
 import { Button } from './button';
 import { Card } from './card';
 import { cn } from '@/lib/cn';
@@ -18,6 +18,21 @@ export function ErrorBanner({ message, onClose }: { message: string | null; onCl
       <span className="min-w-0 flex-1 overflow-wrap-anywhere">{message}</span>
       {onClose && (
         <Button variant="ghost" size="icon-sm" className="-mr-2 -mt-1 text-red-200 hover:bg-red-400/10" onClick={onClose} aria-label="关闭错误提示">
+          <X className="h-4 w-4" aria-hidden="true" />
+        </Button>
+      )}
+    </div>
+  );
+}
+
+export function SuccessBanner({ message, onClose }: { message: string | null; onClose?: () => void }) {
+  if (!message) return null;
+  return (
+    <div className="flex items-start gap-3 rounded-xl border border-emerald-400/25 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-100" role="status">
+      <CheckCircle className="mt-0.5 h-5 w-5 shrink-0 text-emerald-300" weight="fill" aria-hidden="true" />
+      <span className="min-w-0 flex-1 overflow-wrap-anywhere">{message}</span>
+      {onClose && (
+        <Button variant="ghost" size="icon-sm" className="-mr-2 -mt-1 text-emerald-200 hover:bg-emerald-400/10" onClick={onClose} aria-label="关闭成功提示">
           <X className="h-4 w-4" aria-hidden="true" />
         </Button>
       )}

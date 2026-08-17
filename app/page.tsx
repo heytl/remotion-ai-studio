@@ -3,39 +3,46 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { ArrowRight, Clock, FilmSlate, MagicWand, MonitorPlay, Stack, VideoCamera } from '@phosphor-icons/react';
-import { apiGet, apiPost } from '@/lib/api';
-import { Project, Requirements } from '@/lib/types';
+import { ArrowRight, Clock, FilmSlate, MagicWand, MonitorPlay, Stack, Trash, VideoCamera } from '@phosphor-icons/react';
+import { apiDelete, apiGet, apiPost } from '@/lib/api';
+import { Project, ProjectStatus, ProjectSummary, Requirements } from '@/lib/types';
 import { StudioShell } from '@/components/StudioShell';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
-import { ErrorBanner, EmptyState } from '@/components/ui/feedback';
+import { ErrorBanner, EmptyState, SuccessBanner } from '@/components/ui/feedback';
 import { Field } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
 import { NativeSelect } from '@/components/ui/native-select';
-
-interface ProjectMeta {
-  id: string;
-  topic: string;
-  createdAt: string;
-  updatedAt: string;
-}
+import { Progress } from '@/components/ui/progress';
 
 const STYLES = ['科普', '营销', '故事化', '教程', '产品宣传', 'Vlog'];
+const STEP_LABELS = ['需求设置', '大纲编辑', '文稿编辑', '视频预览', '导出视频'];
+const STEP_SLUGS = ['requirements', 'outline', 'script', 'preview', 'export'];
+const STATUS_META: Record<ProjectStatus, { label: string; variant: 'secondary' | 'default' | 'success' | 'warning' | 'destructive' }> = {
+  draft: { label: '草稿', variant: 'secondary' },
+  'outline-ready': { label: '大纲完成', variant: 'default' },
+  'script-ready': { label: '文稿完成', variant: 'default' },
+  'preview-ready': { label: '可预览', variant: 'warning' },
+  rendering: { label: '渲染中', variant: 'warning' },
+  completed: { label: '已完成', variant: 'success' },
+  'render-failed': { label: '渲染失败', variant: 'destructive' },
+};
 
 export default function HomePage() {
   const router = useRouter();
-  const [projects, setProjects] = useState<ProjectMeta[]>([]);
+  const [projects, setProjects] = useState<ProjectSummary[]>([]);
   const [form, setForm] = useState<Requirements>({
     topic: '', durationSeconds: 60, style: '科普', audience: '大众', language: '中文', aspectRatio: '16:9',
   });
   const [creating, setCreating] = useState(false);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     try {
-      const data = await apiGet<{ projects: ProjectMeta[] }>('/api/projects');
+      const data = await apiGet<{ projects: ProjectSummary[] }>('/api/projects');
       setProjects(data.projects);
     } catch (e) {
       setError((e as Error).message);
@@ -61,6 +68,24 @@ export default function HomePage() {
     }
   };
 
+  const removeProject = async (project: ProjectSummary) => {
+    const name = project.topic || '未命名项目';
+    const confirmed = window.confirm(`确认删除“${name}”吗？\n\n项目内容、渲染记录和已导出视频都会被永久删除，此操作无法撤销。`);
+    if (!confirmed) return;
+    setDeletingId(project.id);
+    setError(null);
+    setNotice(null);
+    try {
+      await apiDelete<{ ok: true; deletedJobs: number; deletedOutputs: number }>(`/api/projects/${project.id}`);
+      setProjects((current) => current.filter((item) => item.id !== project.id));
+      setNotice(`项目“${name}”已删除`);
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setDeletingId(null);
+    }
+  };
+
   return (
     <StudioShell active="home">
       <section className="mb-8 pt-1 sm:mb-10 sm:pt-3" aria-labelledby="home-title">
@@ -74,6 +99,7 @@ export default function HomePage() {
       </section>
 
       <ErrorBanner message={error} onClose={() => setError(null)} />
+      <SuccessBanner message={notice} onClose={() => setNotice(null)} />
 
       <Card className="glass-panel studio-grid mt-5 overflow-hidden border-border/25">
         <div className="grid lg:grid-cols-[minmax(0,1.35fr)_minmax(320px,.65fr)]">
@@ -150,20 +176,36 @@ export default function HomePage() {
           <EmptyState icon={<FilmSlate className="h-6 w-6" aria-hidden="true" />} title="还没有项目" description="从上方输入一个视频主题，创建你的第一支 AI 视频。" />
         ) : (
           <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-            {projects.map((project, index) => (
-              <Link key={project.id} href={`/project/${project.id}`} className="group overflow-hidden rounded-2xl border border-border/15 bg-card/70 transition-[transform,border-color,box-shadow] duration-200 hover:-translate-y-1 hover:border-primary/35 hover:shadow-panel focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring motion-reduce:transition-none">
-                <div className={`relative h-36 overflow-hidden border-b border-border/15 ${index % 3 === 0 ? 'bg-[radial-gradient(circle_at_72%_30%,#606bd4,transparent_24%),radial-gradient(circle_at_35%_90%,#172450,transparent_48%),#090d18]' : index % 3 === 1 ? 'bg-[repeating-linear-gradient(90deg,transparent_0_36px,rgba(48,219,233,.07)_37px),linear-gradient(135deg,#07101a,#0b2a38)]' : 'bg-[radial-gradient(circle_at_50%_40%,rgba(198,152,255,.52),transparent_18%),linear-gradient(145deg,#140d1e,#241437_60%,#0d0a12)]'}`}>
-                  <div className="absolute inset-x-5 bottom-5 flex items-center gap-2"><span className="h-px flex-1 bg-white/20" /><span className="h-2 w-2 rounded-full bg-cyan-300 shadow-[0_0_12px_rgba(103,232,249,.7)]" /></div>
-                </div>
-                <div className="p-4">
-                  <div className="flex items-start justify-between gap-4">
-                    <div className="min-w-0"><h3 className="truncate text-sm font-semibold text-foreground">{project.topic || '未命名项目'}</h3><p className="mt-1 text-xs text-muted-foreground">更新于 {new Date(project.updatedAt).toLocaleString()}</p></div>
-                    <ArrowRight className="mt-1 h-4 w-4 shrink-0 text-muted-foreground transition-transform group-hover:translate-x-0.5 motion-reduce:transition-none" aria-hidden="true" />
+            {projects.map((project, index) => {
+              const status = STATUS_META[project.status];
+              const projectHref = `/project/${project.id}?step=${STEP_SLUGS[project.currentStep]}`;
+              return (
+                <article key={project.id} className="group overflow-hidden rounded-2xl border border-border/15 bg-card/70 transition-[transform,border-color,box-shadow] duration-200 hover:-translate-y-1 hover:border-primary/35 hover:shadow-panel motion-reduce:transition-none">
+                  <Link href={projectHref} className="block focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring" aria-label={`继续编辑${project.topic || '未命名项目'}`}>
+                    <div className={`relative h-36 overflow-hidden border-b border-border/15 ${index % 3 === 0 ? 'bg-[radial-gradient(circle_at_72%_30%,#606bd4,transparent_24%),radial-gradient(circle_at_35%_90%,#172450,transparent_48%),#090d18]' : index % 3 === 1 ? 'bg-[repeating-linear-gradient(90deg,transparent_0_36px,rgba(48,219,233,.07)_37px),linear-gradient(135deg,#07101a,#0b2a38)]' : 'bg-[radial-gradient(circle_at_50%_40%,rgba(198,152,255,.52),transparent_18%),linear-gradient(145deg,#140d1e,#241437_60%,#0d0a12)]'}`}>
+                      <div className="absolute left-4 top-4"><Badge variant={status.variant}>{status.label}</Badge></div>
+                      <div className="absolute inset-x-5 bottom-5 flex items-center gap-2"><span className="h-px flex-1 bg-white/20" /><span className="h-2 w-2 rounded-full bg-cyan-300 shadow-[0_0_12px_rgba(103,232,249,.7)]" /></div>
+                    </div>
+                    <div className="px-4 pb-3 pt-4">
+                      <div className="flex items-start justify-between gap-4">
+                        <div className="min-w-0"><h3 className="truncate text-sm font-semibold text-foreground">{project.topic || '未命名项目'}</h3><p className="mt-1 text-xs text-muted-foreground">更新于 {new Date(project.updatedAt).toLocaleString()}</p></div>
+                        <ArrowRight className="mt-1 h-4 w-4 shrink-0 text-muted-foreground transition-transform group-hover:translate-x-0.5 motion-reduce:transition-none" aria-hidden="true" />
+                      </div>
+                      <div className="mt-4 flex items-center justify-between text-[11px] text-muted-foreground"><span>进度 {project.completedStages}/{project.totalStages}</span><span>{project.progress}%</span></div>
+                      <Progress value={project.progress} className="mt-2 h-1.5" />
+                    </div>
+                  </Link>
+                  <div className="flex items-center justify-between gap-3 border-t border-border/10 px-4 py-3">
+                    <Button asChild variant="ghost" size="sm" className="min-w-0 justify-start px-0 text-indigo-200 hover:bg-transparent hover:text-indigo-100">
+                      <Link href={projectHref}>继续到{STEP_LABELS[project.currentStep]} <ArrowRight className="h-3.5 w-3.5" /></Link>
+                    </Button>
+                    <Button variant="ghost" size="icon-sm" className="text-muted-foreground hover:bg-red-400/10 hover:text-red-200" loading={deletingId === project.id} disabled={Boolean(deletingId && deletingId !== project.id)} onClick={() => void removeProject(project)} aria-label={`删除项目${project.topic || '未命名项目'}`} title="删除项目">
+                      <Trash className="h-4 w-4" weight="bold" />
+                    </Button>
                   </div>
-                  <div className="mt-4 flex items-center justify-between"><Badge variant="outline"><span className="h-1.5 w-1.5 rounded-full bg-emerald-300" />可继续</Badge><span className="font-mono text-[10px] text-muted-foreground">{project.id.slice(-8)}</span></div>
-                </div>
-              </Link>
-            ))}
+                </article>
+              );
+            })}
           </div>
         )}
       </section>

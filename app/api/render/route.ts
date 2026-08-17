@@ -3,6 +3,7 @@ import { enqueueRender } from '@/lib/render-queue';
 import { getProject, listRenderJobs, saveProject, saveRenderJob } from '@/lib/store';
 import { RenderJob, VideoSchema } from '@/lib/types';
 import { uid } from '@/lib/utils';
+import { normalizeVideoSchema } from '@/lib/schema-builder';
 
 export async function GET(req: NextRequest) {
   const projectId = req.nextUrl.searchParams.get('projectId') || undefined;
@@ -18,8 +19,17 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: '请先生成可视化 Schema（预览步骤）' }, { status: 400 });
     }
 
-    // 保存最终 Schema，作为渲染依据
-    project.schema = schema;
+    const normalizedSchema = normalizeVideoSchema(schema);
+    const blockingIssues = normalizedSchema.qualityReport.issues.filter((issue) => issue.severity === 'error');
+    if (blockingIssues.length > 0) {
+      return NextResponse.json(
+        { error: `质量检查未通过：${blockingIssues.map((issue) => issue.message).join('；')}` },
+        { status: 400 }
+      );
+    }
+
+    // 保存通过质量门禁的最终 Schema，作为渲染依据。
+    project.schema = normalizedSchema;
     saveProject(project);
 
     const now = new Date().toISOString();

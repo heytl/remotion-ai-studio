@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { deleteProject, getProject, saveProject } from '@/lib/store';
+import { deleteProject, getProject, listRenderJobs, saveProject } from '@/lib/store';
 import { Project } from '@/lib/types';
 
 type Ctx = { params: Promise<{ id: string }> };
@@ -32,7 +32,18 @@ export async function PUT(req: NextRequest, { params }: Ctx) {
 }
 
 export async function DELETE(_req: NextRequest, { params }: Ctx) {
-  const { id } = await params;
-  deleteProject(id);
-  return NextResponse.json({ ok: true });
+  try {
+    const { id } = await params;
+    const project = getProject(id);
+    if (!project) return NextResponse.json({ error: '项目不存在' }, { status: 404 });
+    const hasActiveRender = listRenderJobs(id).some((job) => job.status === 'queued' || job.status === 'rendering');
+    if (hasActiveRender) {
+      return NextResponse.json({ error: '项目正在渲染，完成或失败后才能删除' }, { status: 409 });
+    }
+    const result = deleteProject(id);
+    if (!result) return NextResponse.json({ error: '项目不存在' }, { status: 404 });
+    return NextResponse.json({ ok: true, ...result });
+  } catch (e) {
+    return NextResponse.json({ error: (e as Error).message }, { status: 500 });
+  }
 }

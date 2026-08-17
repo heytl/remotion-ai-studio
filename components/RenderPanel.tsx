@@ -26,17 +26,20 @@ export const RenderPanel: React.FC<{ project: Project; patch: Patch }> = ({ proj
   const schema = project.schema;
   const totalSeconds = schema ? schema.scenes.reduce((sum, scene) => sum + (scene.durationSeconds || 0), 0) : 0;
   const hasAudio = schema?.scenes.some((scene) => Boolean(scene.audioDataUrl)) ?? false;
+  const blockingIssues = schema?.qualityReport.issues.filter((issue) => issue.severity === 'error') || [];
 
   return (
     <div className="mx-auto max-w-5xl space-y-6">
-      <PageHeading eyebrow="Step 05 · Render queue" title="导出最终视频" description="提交 Remotion 服务端渲染任务，并在这里查看实时进度和历史结果。" actions={<Button loading={starting} disabled={!schema || hasActive} onClick={start}><Export className="h-4 w-4" weight="bold" />{hasActive ? '任务进行中' : '开始渲染 MP4'}</Button>} />
+      <PageHeading eyebrow="Step 05 · Render queue" title="导出最终视频" description="通过字幕、时长与画面密度检查后提交 Remotion 渲染任务。" actions={<Button loading={starting} disabled={!schema || hasActive || blockingIssues.length > 0} onClick={start}><Export className="h-4 w-4" weight="bold" />{hasActive ? '任务进行中' : blockingIssues.length ? '请先修复质量问题' : '开始渲染 MP4'}</Button>} />
       <ErrorBanner message={error} onClose={() => setError(null)} />
+      {blockingIssues.length > 0 ? <ErrorBanner message={`质量检查未通过：${blockingIssues.map((issue) => issue.message).join('；')}`} /> : null}
 
       <Card className="overflow-hidden">
-        <div className="studio-grid grid gap-5 bg-primary/[0.045] p-5 sm:grid-cols-3 sm:p-6">
+        <div className="studio-grid grid gap-5 bg-primary/[0.045] p-5 sm:grid-cols-2 sm:p-6 lg:grid-cols-4">
           <RenderMetric icon={<Clock />} label="视频时长" value={formatSeconds(totalSeconds)} />
           <RenderMetric icon={<FilmSlate />} label="场景与画幅" value={`${schema?.scenes.length || 0} scenes · ${schema?.aspectRatio || '-'}`} />
           <RenderMetric icon={<SpeakerHigh />} label="音轨状态" value={hasAudio ? '已包含 TTS 配音' : '纯画面与字幕'} />
+          <RenderMetric icon={schema && schema.qualityReport.score >= 90 ? <CheckCircle /> : <WarningCircle />} label="生成质量" value={schema ? `${schema.qualityReport.score} / 100` : '-'} />
         </div>
       </Card>
 

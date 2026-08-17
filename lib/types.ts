@@ -25,6 +25,34 @@ export interface OutlineScene {
 /** 步骤 3：文稿（分镜脚本） */
 export type SceneType = 'title' | 'bullets' | 'imageText' | 'caption' | 'transition';
 
+export type VisualLayout = 'hero' | 'split' | 'cards' | 'timeline' | 'comparison' | 'diagram';
+export type MotionPreset = 'calm' | 'explain' | 'flow' | 'compare' | 'energetic';
+export type VisualElementKind = 'concept' | 'metric' | 'step' | 'comparison' | 'quote';
+
+/** 供模型生成的语义节拍。渲染时会按旁白长度自动计算时间。 */
+export interface ScriptBeat {
+  narration: string;
+  displayText: string;
+  visualAction: string;
+}
+
+/** 结构化视觉元素，避免 free-form visual 生成后无法渲染。 */
+export interface VisualElement {
+  id: string;
+  kind: VisualElementKind;
+  label: string;
+  description: string;
+  value?: string;
+}
+
+export interface VisualPlan {
+  layout: VisualLayout;
+  focusText: string;
+  supportingText: string;
+  motionPreset: MotionPreset;
+  elements: VisualElement[];
+}
+
 export interface ScriptScene {
   id: string;
   title: string;
@@ -33,8 +61,12 @@ export interface ScriptScene {
   bullets: string[]; // 要点列表（bullets 场景使用）
   durationSeconds: number;
   sceneType: SceneType;
+  beats?: ScriptBeat[];
+  visualPlan?: Partial<VisualPlan>;
   /** 可选：由 TTS 生成的配音（data URL） */
   audioDataUrl?: string;
+  /** 浏览器读取的真实音频时长，用于避免配音被截断。 */
+  audioDurationSeconds?: number;
 }
 
 /** 步骤 4/5：Remotion 可视化 Schema（驱动渲染的结构化数据） */
@@ -49,6 +81,24 @@ export interface VideoTheme {
   fontFamily: string;
   headingSize: number;
   bodySize: number;
+  surfaceColor: string;
+  mutedTextColor: string;
+  captionBackgroundColor: string;
+  captionTextColor: string;
+}
+
+export interface CaptionCue {
+  id: string;
+  text: string;
+  startMs: number;
+  endMs: number;
+  emphasis: string[];
+}
+
+export interface VideoBeat extends ScriptBeat {
+  id: string;
+  startMs: number;
+  endMs: number;
 }
 
 export interface VideoScene {
@@ -60,22 +110,66 @@ export interface VideoScene {
   narration: string;
   imageUrl: string; // http(s) URL 或 data URL
   audioDataUrl?: string;
+  audioDurationSeconds?: number;
   durationSeconds: number;
   animation: Animation;
   backgroundType: BackgroundType;
   backgroundColor: string;
   gradientFrom: string;
   gradientTo: string;
+  captions: CaptionCue[];
+  beats: VideoBeat[];
+  visualPlan: VisualPlan;
+}
+
+export type QualitySeverity = 'info' | 'warning' | 'error';
+
+export interface QualityIssue {
+  code: string;
+  severity: QualitySeverity;
+  sceneId?: string;
+  message: string;
+  suggestion: string;
+}
+
+export interface QualityReport {
+  score: number;
+  generatedAt: string;
+  issues: QualityIssue[];
+  metrics: {
+    totalScenes: number;
+    totalBeats: number;
+    totalCaptions: number;
+    averageVisualElements: number;
+    layoutVariety: number;
+  };
 }
 
 export interface VideoSchema {
+  schemaVersion: 2;
   id: string;
   title: string;
   aspectRatio: AspectRatio;
   fps: number;
   theme: VideoTheme;
   scenes: VideoScene[];
+  qualityReport: QualityReport;
 }
+
+/** 项目在五步创作流程中的持久化位置。 */
+export interface ProjectWorkflow {
+  currentStep: number;
+  lastVisitedAt: string;
+}
+
+export type ProjectStatus =
+  | 'draft'
+  | 'outline-ready'
+  | 'script-ready'
+  | 'preview-ready'
+  | 'rendering'
+  | 'completed'
+  | 'render-failed';
 
 /** 项目（持久化到 data/projects/<id>.json） */
 export interface Project {
@@ -86,6 +180,21 @@ export interface Project {
   outline: OutlineScene[];
   script: ScriptScene[];
   schema: VideoSchema | null;
+  workflow: ProjectWorkflow;
+}
+
+/** 首页项目管理列表所需的轻量摘要。 */
+export interface ProjectSummary {
+  id: string;
+  topic: string;
+  createdAt: string;
+  updatedAt: string;
+  status: ProjectStatus;
+  progress: number;
+  completedStages: number;
+  totalStages: number;
+  currentStep: number;
+  renderProgress?: number;
 }
 
 /** 大模型 / TTS 配置（持久化到 data/config.json，可用环境变量覆盖） */

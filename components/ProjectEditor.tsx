@@ -4,6 +4,7 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { Article, ArrowLeft, Check, Export, GearSix, ListBullets, MonitorPlay, SlidersHorizontal } from '@phosphor-icons/react';
 import { apiGet, apiPut } from '@/lib/api';
+import { withProjectStep } from '@/lib/project-workflow';
 import { buildSchema } from '@/lib/schema-builder';
 import { Project } from '@/lib/types';
 import { Brand } from './Brand';
@@ -13,6 +14,7 @@ import { Patch, RequirementsForm } from './RequirementsForm';
 import { RenderPanel } from './RenderPanel';
 import { ScriptEditor } from './ScriptEditor';
 import { Button } from './ui/button';
+import { Badge } from './ui/badge';
 import { ErrorBanner, Spinner } from './ui/feedback';
 import { cn } from '@/lib/cn';
 
@@ -24,6 +26,22 @@ const STEPS = [
   { label: '导出', description: '渲染最终视频', icon: Export },
 ];
 
+const STEP_SLUGS = ['requirements', 'outline', 'script', 'preview', 'export'] as const;
+
+function replaceStepUrl(projectId: string, step: number): void {
+  if (typeof window === 'undefined') return;
+  const url = new URL(window.location.href);
+  url.searchParams.set('step', STEP_SLUGS[step]);
+  window.history.replaceState(window.history.state, '', `${url.pathname}${url.search}${url.hash}`);
+}
+
+function getRequestedStep(): number | null {
+  if (typeof window === 'undefined') return null;
+  const requested = new URL(window.location.href).searchParams.get('step');
+  const index = STEP_SLUGS.findIndex((slug) => slug === requested);
+  return index >= 0 ? index : null;
+}
+
 export const ProjectEditor: React.FC<{ projectId: string }> = ({ projectId }) => {
   const [project, setProject] = useState<Project | null>(null);
   const [loading, setLoading] = useState(true);
@@ -33,23 +51,47 @@ export const ProjectEditor: React.FC<{ projectId: string }> = ({ projectId }) =>
   const [step, setStep] = useState(0);
   const projectRef = useRef<Project | null>(null);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const saveQueueRef = useRef<Promise<void>>(Promise.resolve());
+  const pendingSavesRef = useRef(0);
 
   useEffect(() => {
     let mounted = true;
     (async () => {
       try {
         const data = await apiGet<{ project: Project }>(`/api/projects/${projectId}`);
-        if (mounted) { projectRef.current = data.project; setProject(data.project); }
+        if (mounted) {
+          const requestedStep = getRequestedStep();
+          const restoredStep = requestedStep ?? data.project.workflow.currentStep;
+          const restoredProject = restoredStep === data.project.workflow.currentStep
+            ? data.project
+            : withProjectStep(data.project, restoredStep);
+          projectRef.current = restoredProject;
+          setProject(restoredProject);
+          setStep(restoredStep);
+          replaceStepUrl(projectId, restoredStep);
+          if (restoredProject !== data.project) void apiPut(`/api/projects/${projectId}`, restoredProject);
+        }
       } catch (e) { if (mounted) setError((e as Error).message); }
       finally { if (mounted) setLoading(false); }
     })();
     return () => { mounted = false; if (timerRef.current) clearTimeout(timerRef.current); };
   }, [projectId]);
 
-  const flushSave = useCallback(async (nextProject: Project) => {
-    try { await apiPut(`/api/projects/${nextProject.id}`, nextProject); setSavedAt(new Date()); }
-    catch (e) { setError((e as Error).message); }
-    finally { setSaving(false); }
+  const flushSave = useCallback((nextProject: Project): Promise<void> => {
+    pendingSavesRef.current += 1;
+    setSaving(true);
+    const operation = saveQueueRef.current.then(async () => {
+      await apiPut(`/api/projects/${nextProject.id}`, nextProject);
+    });
+    const settled = operation
+      .then(() => setSavedAt(new Date()))
+      .catch((e) => setError((e as Error).message))
+      .finally(() => {
+        pendingSavesRef.current -= 1;
+        if (pendingSavesRef.current === 0) setSaving(false);
+      });
+    saveQueueRef.current = settled;
+    return settled;
   }, []);
 
   const scheduleSave = useCallback((nextProject: Project) => {
@@ -67,14 +109,33 @@ export const ProjectEditor: React.FC<{ projectId: string }> = ({ projectId }) =>
     scheduleSave(next);
   }, [scheduleSave]);
 
+  const goToStep = useCallback((nextStep: number) => {
+    const current = projectRef.current;
+    if (!current) return;
+    if (timerRef.current) clearTimeout(timerRef.current);
+    const next = withProjectStep(current, nextStep);
+    projectRef.current = next;
+    setProject(next);
+    setStep(next.workflow.currentStep);
+    replaceStepUrl(next.id, next.workflow.currentStep);
+    void flushSave(next);
+  }, [flushSave]);
+
   const handleNext = useCallback(() => {
     const current = projectRef.current;
     if (!current) return;
+    const nextStep = Math.min(STEPS.length - 1, step + 1);
+    let next = current;
     if (step === 2 && current.script.length) {
-      const next = { ...current, schema: buildSchema(current, current.schema) };
-      projectRef.current = next; setProject(next); void flushSave(next);
+      next = { ...current, schema: buildSchema(current, current.schema) };
     }
-    setStep((value) => Math.min(STEPS.length - 1, value + 1));
+    if (timerRef.current) clearTimeout(timerRef.current);
+    next = withProjectStep(next, nextStep);
+    projectRef.current = next;
+    setProject(next);
+    setStep(nextStep);
+    replaceStepUrl(next.id, nextStep);
+    void flushSave(next);
   }, [step, flushSave]);
 
   if (loading) return <div className="flex min-h-screen items-center justify-center gap-3 text-sm text-muted-foreground"><Spinner />加载项目工作区…</div>;
@@ -95,7 +156,7 @@ export const ProjectEditor: React.FC<{ projectId: string }> = ({ projectId }) =>
           <Link href="/" className="hidden focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring sm:block" aria-label="返回创作空间"><Brand compact /></Link>
           <span className="hidden h-7 w-px bg-border/15 sm:block" />
           <div className="min-w-0">
-            <div className="flex items-center gap-2"><p className="truncate text-sm font-semibold text-foreground sm:text-base">{project.requirements.topic || '未命名项目'}</p>{saving ? <span className="hidden text-[11px] text-muted-foreground sm:inline">保存中…</span> : savedAt ? <span className="hidden items-center gap-1 text-[11px] text-emerald-200 sm:inline-flex"><Check className="h-3 w-3" weight="bold" />已保存</span> : null}</div>
+            <div className="flex items-center gap-2"><p className="truncate text-sm font-semibold text-foreground sm:text-base">{project.requirements.topic || '未命名项目'}</p><Badge variant="secondary" className="hidden sm:inline-flex">第 {step + 1}/5 步 · {STEPS[step].label}</Badge>{saving ? <span className="hidden text-[11px] text-muted-foreground sm:inline">保存中…</span> : savedAt ? <span className="hidden items-center gap-1 text-[11px] text-emerald-200 sm:inline-flex"><Check className="h-3 w-3" weight="bold" />已保存</span> : null}</div>
             <p className="mt-0.5 hidden text-[10px] uppercase tracking-[0.12em] text-muted-foreground sm:block">Project workspace</p>
           </div>
         </div>
@@ -109,7 +170,7 @@ export const ProjectEditor: React.FC<{ projectId: string }> = ({ projectId }) =>
             {STEPS.map((item, index) => {
               const Icon = item.icon;
               return (
-                <button key={item.label} onClick={() => setStep(index)} aria-current={step === index ? 'step' : undefined} className={cn('group flex min-h-12 shrink-0 items-center gap-3 rounded-xl border px-3 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring lg:w-full', step === index ? 'border-primary/25 bg-primary/12 text-foreground' : 'border-transparent text-muted-foreground hover:bg-accent/55 hover:text-foreground')}>
+                <button key={item.label} onClick={() => goToStep(index)} aria-current={step === index ? 'step' : undefined} className={cn('group flex min-h-12 shrink-0 items-center gap-3 rounded-xl border px-3 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring lg:w-full', step === index ? 'border-primary/25 bg-primary/12 text-foreground' : 'border-transparent text-muted-foreground hover:bg-accent/55 hover:text-foreground')}>
                   <span className={cn('grid h-8 w-8 shrink-0 place-items-center rounded-lg border text-xs font-bold', step === index ? 'border-primary/25 bg-primary text-white' : completed[index] ? 'border-emerald-400/20 bg-emerald-400/10 text-emerald-200' : 'border-border/15 bg-secondary/70 text-muted-foreground')}>
                     {completed[index] && step !== index ? <Check className="h-4 w-4" weight="bold" /> : <Icon className="h-4 w-4" weight={step === index ? 'fill' : 'regular'} />}
                   </span>
@@ -132,7 +193,7 @@ export const ProjectEditor: React.FC<{ projectId: string }> = ({ projectId }) =>
           {step === 2 && <ScriptEditor project={project} patch={patch} onNext={handleNext} />}
           {step === 3 && <PreviewEditor project={project} patch={patch} onNext={handleNext} />}
           {step === 4 && <RenderPanel project={project} patch={patch} />}
-          {step > 0 && <div className="mt-7 border-t border-border/15 pt-5"><Button variant="ghost" onClick={() => setStep((value) => Math.max(0, value - 1))}><ArrowLeft className="h-4 w-4" />上一步</Button></div>}
+          {step > 0 && <div className="mt-7 border-t border-border/15 pt-5"><Button variant="ghost" onClick={() => goToStep(step - 1)}><ArrowLeft className="h-4 w-4" />上一步</Button></div>}
         </main>
       </div>
     </div>

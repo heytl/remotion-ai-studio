@@ -15,4 +15,6 @@ data/
 
 # misc
 *.log
+*.tsbuildinfo
+artifacts/validation/*.png
 .DS_Store

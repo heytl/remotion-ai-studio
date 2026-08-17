@@ -8,14 +8,18 @@
 
 import fs from 'fs';
 import path from 'path';
-import { AppConfig, Project, RenderJob, Requirements } from './types';
+import { AppConfig, Project, ProjectSummary, RenderJob, Requirements } from './types';
 import { uid } from './utils';
+import { normalizeVideoSchema } from './schema-builder';
+import { buildProjectSummary, normalizeProjectWorkflow } from './project-workflow';
 
 export const DATA_DIR = path.join(process.cwd(), 'data');
 const PROJECTS_DIR = path.join(DATA_DIR, 'projects');
 const RENDERS_DIR = path.join(DATA_DIR, 'renders');
 export const OUTPUT_DIR = path.join(RENDERS_DIR, 'output');
 const CONFIG_FILE = path.join(DATA_DIR, 'config.json');
+const PROJECT_ID_PATTERN = /^p_[A-Za-z0-9_-]+$/;
+const RENDER_ID_PATTERN = /^r_[A-Za-z0-9_-]+$/;
 
 function ensureDirs(): void {
   for (const d of [DATA_DIR, PROJECTS_DIR, RENDERS_DIR, OUTPUT_DIR]) {
@@ -111,39 +115,84 @@ export function createProject(requirements: Partial<Requirements>): Project {
     outline: [],
     script: [],
     schema: null,
+    workflow: { currentStep: 0, lastVisitedAt: now },
   };
   saveProject(project);
   return project;
 }
 
 export function getProject(id: string): Project | null {
+  if (!PROJECT_ID_PATTERN.test(id)) return null;
   const p = readJson<Project | null>(path.join(PROJECTS_DIR, `${id}.json`), null);
   if (!p) return null;
   return {
     ...p,
     outline: p.outline || [],
     script: p.script || [],
-    schema: p.schema || null,
+    schema: p.schema ? normalizeVideoSchema(p.schema) : null,
+    workflow: normalizeProjectWorkflow(p, listRenderJobs(id)),
   };
 }
 
 export function saveProject(project: Project): void {
+  if (!PROJECT_ID_PATTERN.test(project.id)) throw new Error('项目 ID 无效');
   project.updatedAt = new Date().toISOString();
+  project.workflow = normalizeProjectWorkflow(project, listRenderJobs(project.id));
   writeJson(path.join(PROJECTS_DIR, `${project.id}.json`), project);
 }
 
-export function deleteProject(id: string): void {
-  const file = path.join(PROJECTS_DIR, `${id}.json`);
-  if (fs.existsSync(file)) fs.unlinkSync(file);
+export interface ProjectDeletionResult {
+  deletedJobs: number;
+  deletedOutputs: number;
 }
 
-export function listProjects(): Array<{ id: string; topic: string; createdAt: string; updatedAt: string }> {
+function isInsideOutputDirectory(file: string): boolean {
+  const relative = path.relative(OUTPUT_DIR, path.resolve(file));
+  return relative === '' || (!relative.startsWith('..') && !path.isAbsolute(relative));
+}
+
+/** 删除项目以及只属于该项目的渲染记录和导出文件。 */
+export function deleteProject(id: string): ProjectDeletionResult | null {
+  if (!PROJECT_ID_PATTERN.test(id)) return null;
+  const file = path.join(PROJECTS_DIR, `${id}.json`);
+  if (!fs.existsSync(file)) return null;
+
+  let deletedJobs = 0;
+  let deletedOutputs = 0;
+  for (const job of listRenderJobs(id)) {
+    if (!RENDER_ID_PATTERN.test(job.id)) continue;
+    const outputCandidates = new Set([
+      path.join(OUTPUT_DIR, `${job.id}.mp4`),
+      ...(job.outputPath ? [job.outputPath] : []),
+    ]);
+    for (const output of outputCandidates) {
+      if (isInsideOutputDirectory(output) && fs.existsSync(output)) {
+        fs.unlinkSync(output);
+        deletedOutputs += 1;
+      }
+    }
+    const jobFile = path.join(RENDERS_DIR, `${job.id}.json`);
+    if (fs.existsSync(jobFile)) {
+      fs.unlinkSync(jobFile);
+      deletedJobs += 1;
+    }
+  }
+
+  fs.unlinkSync(file);
+  return { deletedJobs, deletedOutputs };
+}
+
+export function listProjects(): ProjectSummary[] {
   const files = fs.existsSync(PROJECTS_DIR) ? fs.readdirSync(PROJECTS_DIR) : [];
-  const out: Array<{ id: string; topic: string; createdAt: string; updatedAt: string }> = [];
+  const jobsByProject = new Map<string, RenderJob[]>();
+  for (const job of listRenderJobs()) {
+    jobsByProject.set(job.projectId, [...(jobsByProject.get(job.projectId) || []), job]);
+  }
+  const out: ProjectSummary[] = [];
   for (const f of files) {
     if (!f.endsWith('.json')) continue;
     const p = readJson<Project | null>(path.join(PROJECTS_DIR, f), null);
-    if (p) out.push({ id: p.id, topic: p.requirements.topic, createdAt: p.createdAt, updatedAt: p.updatedAt });
+    if (p && PROJECT_ID_PATTERN.test(p.id)) out.push(buildProjectSummary(p, jobsByProject.get(p.id) || []));
   }
   return out.sort((a, b) => (a.updatedAt < b.updatedAt ? 1 : -1));
 }

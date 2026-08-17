@@ -6,6 +6,7 @@ import { CaptionScene } from './scenes/CaptionScene';
 import { ImageTextScene } from './scenes/ImageTextScene';
 import { TitleScene } from './scenes/TitleScene';
 import { TransitionScene } from './scenes/TransitionScene';
+import { SceneEnvelope } from './scenes/common';
 
 const SceneRenderer: React.FC<{ scene: VideoScene; theme: VideoTheme }> = ({ scene, theme }) => {
   switch (scene.type) {
@@ -38,7 +39,9 @@ export const VideoComposition: React.FC<{ schema: VideoSchema }> = ({ schema }) 
         return (
           <Sequence key={scene.id} from={from} durationInFrames={durationInFrames} name={scene.title || scene.type}>
             {scene.audioDataUrl ? <Audio src={scene.audioDataUrl} /> : null}
-            <SceneRenderer scene={scene} theme={schema.theme} />
+            <SceneEnvelope durationInFrames={durationInFrames}>
+              <SceneRenderer scene={scene} theme={schema.theme} />
+            </SceneEnvelope>
           </Sequence>
         );
       })}

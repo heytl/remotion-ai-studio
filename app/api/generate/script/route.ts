@@ -4,6 +4,7 @@ import { scriptSystemPrompt, scriptUserPrompt } from '@/lib/prompts';
 import { getProject, saveProject } from '@/lib/store';
 import { SceneType, ScriptScene } from '@/lib/types';
 import { isRecord, uid } from '@/lib/utils';
+import { allocateSceneDurations, normalizeScriptScene } from '@/lib/video-planner';
 
 const VALID_TYPES: SceneType[] = ['title', 'bullets', 'imageText', 'caption', 'transition'];
 
@@ -14,7 +15,7 @@ function parseScene(obj: Record<string, unknown>, index: number): ScriptScene {
     : index === 0
       ? 'title'
       : 'caption';
-  return {
+  return normalizeScriptScene({
     id: uid('s_'),
     title: String(obj.title || ''),
     narration: String(obj.narration || ''),
@@ -22,7 +23,9 @@ function parseScene(obj: Record<string, unknown>, index: number): ScriptScene {
     bullets: Array.isArray(obj.bullets) ? obj.bullets.map((b) => String(b)).filter(Boolean) : [],
     durationSeconds: Math.max(2, Math.round(Number(obj.durationSeconds) || 8)),
     sceneType,
-  };
+    beats: Array.isArray(obj.beats) ? (obj.beats as ScriptScene['beats']) : undefined,
+    visualPlan: isRecord(obj.visualPlan) ? obj.visualPlan : undefined,
+  }, index);
 }
 
 export async function POST(req: NextRequest) {
@@ -45,20 +48,9 @@ export async function POST(req: NextRequest) {
     const raw = isRecord(data) && Array.isArray(data.scenes) ? data.scenes : null;
     if (!raw || raw.length === 0) throw new Error('模型未返回有效的文稿场景');
 
-    const scenes = raw.map((s, i) => parseScene(isRecord(s) ? s : {}, i));
-
-    // 按目标时长等比缩放各场景时长
-    const target = Math.max(10, project.requirements.durationSeconds || 60);
-    const total = scenes.reduce((a, s) => a + s.durationSeconds, 0) || 1;
-    let acc = 0;
-    scenes.forEach((s, i) => {
-      if (i === scenes.length - 1) {
-        s.durationSeconds = Math.max(2, target - acc);
-      } else {
-        s.durationSeconds = Math.max(2, Math.round((s.durationSeconds / total) * target));
-        acc += s.durationSeconds;
-      }
-    });
+    const parsed = raw.map((s, i) => parseScene(isRecord(s) ? s : {}, i));
+    // 目标时长足够时按权重分配；不足时自动延长，避免旁白或配音被截断。
+    const scenes = allocateSceneDurations(parsed, Math.max(10, project.requirements.durationSeconds || 60));
 
     project.script = scenes;
     saveProject(project);

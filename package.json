@@ -6,7 +6,10 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
-    "start": "next start"
+    "start": "next start",
+    "test": "node --no-warnings --experimental-strip-types --test tests/*.test.ts",
+    "check": "npm test && tsc --noEmit",
+    "validate:frames": "sucrase-node scripts/render-validation.ts"
   },
   "dependencies": {
     "@phosphor-icons/react": "^2.1.10",

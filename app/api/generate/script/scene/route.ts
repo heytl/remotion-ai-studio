@@ -4,6 +4,7 @@ import { scriptSceneUserPrompt, scriptSystemPrompt } from '@/lib/prompts';
 import { getProject, saveProject } from '@/lib/store';
 import { SceneType } from '@/lib/types';
 import { isRecord } from '@/lib/utils';
+import { allocateSceneDurations, normalizeScriptScene } from '@/lib/video-planner';
 
 const VALID_TYPES: SceneType[] = ['title', 'bullets', 'imageText', 'caption', 'transition'];
 
@@ -30,7 +31,7 @@ export async function POST(req: NextRequest) {
       ? (rawType as SceneType)
       : current.sceneType;
 
-    const regenerated = {
+    const regenerated = normalizeScriptScene({
       ...current,
       title: String(data.title || current.title),
       narration: String(data.narration || current.narration),
@@ -40,13 +41,17 @@ export async function POST(req: NextRequest) {
         : current.bullets,
       durationSeconds: Math.max(2, Math.round(Number(data.durationSeconds) || current.durationSeconds)),
       sceneType,
+      beats: Array.isArray(data.beats) ? (data.beats as typeof current.beats) : current.beats,
+      visualPlan: isRecord(data.visualPlan) ? data.visualPlan : current.visualPlan,
       // 重新生成后旁白可能变化，丢弃旧配音
       audioDataUrl: undefined,
-    };
+      audioDurationSeconds: undefined,
+    }, sceneIndex);
+    const timed = allocateSceneDurations([regenerated], regenerated.durationSeconds)[0];
 
-    project.script[sceneIndex] = regenerated;
+    project.script[sceneIndex] = timed;
     saveProject(project);
-    return NextResponse.json({ scene: regenerated });
+    return NextResponse.json({ scene: timed });
   } catch (e) {
     return NextResponse.json({ error: (e as Error).message }, { status: 500 });
   }
