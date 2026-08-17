@@ -1,0 +1,25 @@
+services:
+  ai-video:
+    build: .
+    container_name: ai-video-generator
+    ports:
+      - "3000:3000"
+    environment:
+      # 大模型配置（OpenAI 兼容）。留空则使用界面「设置」中保存的 data/config.json。
+      # 也可以把下面这些变量写进同目录 .env 文件，docker compose 会自动读取。
+      LLM_BASE_URL: ${LLM_BASE_URL:-}
+      LLM_API_KEY: ${LLM_API_KEY:-}
+      LLM_MODEL: ${LLM_MODEL:-}
+      LLM_TEMPERATURE: ${LLM_TEMPERATURE:-}
+      # 可选 TTS（OpenAI audio/speech 协议）
+      TTS_ENABLED: ${TTS_ENABLED:-false}
+      TTS_BASE_URL: ${TTS_BASE_URL:-}
+      TTS_API_KEY: ${TTS_API_KEY:-}
+      TTS_MODEL: ${TTS_MODEL:-tts-1}
+      TTS_VOICE: ${TTS_VOICE:-alloy}
+    volumes:
+      - ai-video-data:/app/data
+    restart: unless-stopped
+
+volumes:
+  ai-video-data:

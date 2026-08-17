@@ -1,0 +1,2 @@
+# 统一使用 LF 行尾，避免 Windows 与 Linux 之间差异（Dockerfile / 脚本对行尾敏感）
+* text=auto eol=lf
