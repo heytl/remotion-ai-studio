@@ -8,7 +8,7 @@
 
 import fs from 'fs';
 import path from 'path';
-import { AppConfig, Project, ProjectSummary, RenderJob, Requirements } from './types';
+import { AppConfig, Project, ProjectSummary, RenderJob, Requirements, SearchProvider } from './types';
 import { uid } from './utils';
 import { normalizeVideoSchema } from './schema-builder';
 import { buildProjectSummary, normalizeProjectWorkflow } from './project-workflow';
@@ -84,7 +84,10 @@ function applyEnvOverrides(config: AppConfig): AppConfig {
   if (env.TTS_MODEL) next.tts.model = env.TTS_MODEL;
   if (env.TTS_VOICE) next.tts.voice = env.TTS_VOICE;
   if (env.SEARCH_ENABLED) next.search.enabled = env.SEARCH_ENABLED === 'true' || env.SEARCH_ENABLED === '1';
-  if (env.SEARCH_PROVIDER === 'tavily' || env.SEARCH_PROVIDER === 'serper') next.search.provider = env.SEARCH_PROVIDER;
+  const validProviders: SearchProvider[] = ['tavily', 'serper', 'bocha'];
+  if (env.SEARCH_PROVIDER && validProviders.includes(env.SEARCH_PROVIDER as SearchProvider)) {
+    next.search.provider = env.SEARCH_PROVIDER as SearchProvider;
+  }
   if (env.SEARCH_API_KEY) next.search.apiKey = env.SEARCH_API_KEY;
   if (env.SEARCH_MAX_RESULTS) {
     const n = Number(env.SEARCH_MAX_RESULTS);
@@ -106,6 +109,23 @@ export function getConfig(): AppConfig {
 /** 保存到文件（不含环境变量覆盖，环境变量运行时仍然优先生效） */
 export function saveConfig(config: AppConfig): void {
   writeJson(CONFIG_FILE, config);
+}
+
+// ---------------- API Key 脱敏 ----------------
+// 后端返回给前端的配置会把 Key 打码，避免在浏览器 F12/网络面板中泄露。
+
+const KEY_MASK = '••••••••';
+
+/** 打码：仅保留末 4 位，如 sk-xxxx…abcd → ••••••••abcd */
+export function maskKey(key: string): string {
+  const value = String(key || '').trim();
+  if (!value) return '';
+  return value.length <= 8 ? KEY_MASK : `${KEY_MASK}${value.slice(-4)}`;
+}
+
+/** 判断一个值是否为打码后的占位（用于保存时“未修改则不覆盖”）。 */
+export function isMaskedKey(value: string | undefined | null): boolean {
+  return typeof value === 'string' && value.length > 0 && value.includes('•');
 }
 
 // ---------------- 项目 ----------------

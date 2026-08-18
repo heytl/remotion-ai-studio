@@ -98,7 +98,7 @@ export default function SettingsPage() {
           </CardHeader>
           <CardContent className="space-y-5 pt-5 sm:pt-6">
             <Field label="API Base URL" hint="通常包含 /v1 前缀，具体以服务商文档为准。"><Input value={config.llm.baseUrl} onChange={(e) => setLlm({ baseUrl: e.target.value })} autoComplete="url" /></Field>
-            <Field label="API Key"><Input type="password" value={config.llm.apiKey} onChange={(e) => setLlm({ apiKey: e.target.value })} placeholder="sk-..." autoComplete="off" /></Field>
+            <Field label="API Key" hint="已配置时显示为 ••••，保持不修改将沿用现有 Key"><Input type="password" value={config.llm.apiKey} onChange={(e) => setLlm({ apiKey: e.target.value })} placeholder="sk-..." autoComplete="off" /></Field>
             <div className="grid gap-4 sm:grid-cols-2">
               <Field label="模型名称"><Input value={config.llm.model} onChange={(e) => setLlm({ model: e.target.value })} /></Field>
               <Field label="温度（0–2）"><Input type="number" step={0.1} min={0} max={2} value={config.llm.temperature} onChange={(e) => setLlm({ temperature: Number(e.target.value) })} /></Field>
@@ -115,7 +115,7 @@ export default function SettingsPage() {
             <CardContent className="space-y-4 pt-5 sm:pt-6">
               <div className="flex items-center justify-between rounded-xl border border-border/15 bg-background/35 px-3 py-2.5"><Label htmlFor="tts-enabled">启用语音服务</Label><span className={`text-xs font-semibold ${config.tts.enabled ? 'text-emerald-200' : 'text-muted-foreground'}`}>{config.tts.enabled ? '已启用' : '未启用'}</span></div>
               <Field label="TTS Base URL"><Input value={config.tts.baseUrl} disabled={!config.tts.enabled} onChange={(e) => setTts({ baseUrl: e.target.value })} /></Field>
-              <Field label="TTS API Key"><Input type="password" value={config.tts.apiKey} disabled={!config.tts.enabled} onChange={(e) => setTts({ apiKey: e.target.value })} autoComplete="off" /></Field>
+              <Field label="TTS API Key" hint="已配置时显示为 ••••，保持不修改将沿用现有 Key"><Input type="password" value={config.tts.apiKey} disabled={!config.tts.enabled} onChange={(e) => setTts({ apiKey: e.target.value })} autoComplete="off" /></Field>
               <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-1">
                 <Field label="TTS 模型">
                   <NativeSelect value={config.tts.model} disabled={!config.tts.enabled} onChange={(e) => setTts({ model: e.target.value })}>
@@ -146,7 +146,7 @@ export default function SettingsPage() {
             <CardContent className="space-y-4 pt-5 sm:pt-6">
               <div className="flex items-center justify-between rounded-xl border border-border/15 bg-background/35 px-3 py-2.5"><Label htmlFor="search-enabled">启用搜索服务</Label><span className={`text-xs font-semibold ${config.search.enabled ? 'text-emerald-200' : 'text-muted-foreground'}`}>{config.search.enabled ? '已启用' : '未启用'}</span></div>
               <Field label="搜索服务商"><NativeSelect value={config.search.provider} disabled={!config.search.enabled} onChange={(e) => setSearch({ provider: e.target.value as AppConfig['search']['provider'] })}><option value="tavily">Tavily</option><option value="serper">Serper（Google）</option><option value="bocha">Bocha（博查）</option></NativeSelect></Field>
-              <Field label="搜索 API Key"><Input type="password" value={config.search.apiKey} disabled={!config.search.enabled} onChange={(e) => setSearch({ apiKey: e.target.value })} placeholder="tvly-..." autoComplete="off" /></Field>
+              <Field label="搜索 API Key" hint="已配置时显示为 ••••，保持不修改将沿用现有 Key"><Input type="password" value={config.search.apiKey} disabled={!config.search.enabled} onChange={(e) => setSearch({ apiKey: e.target.value })} placeholder="tvly-..." autoComplete="off" /></Field>
               <Field label="每次查询结果数（1–10）"><Input type="number" min={1} max={10} value={config.search.maxResults} disabled={!config.search.enabled} onChange={(e) => setSearch({ maxResults: Number(e.target.value) || 5 })} /></Field>
               <div className="flex flex-col gap-3 border-t border-border/15 pt-5 sm:flex-row sm:items-center"><Button variant="outline" loading={testingSearch} disabled={!config.search.apiKey} onClick={testSearch}><PlugsConnected className="h-4 w-4" aria-hidden="true" />测试搜索连接</Button>{searchTestResult && <div className={`flex items-start gap-2 text-sm ${searchTestResult.ok ? 'text-emerald-200' : 'text-red-200'}`} role="status">{searchTestResult.ok ? <CheckCircle className="mt-0.5 h-4 w-4 shrink-0" weight="fill" /> : <WarningCircle className="mt-0.5 h-4 w-4 shrink-0" weight="fill" />}<span>{searchTestResult.message}</span></div>}</div>
             </CardContent>

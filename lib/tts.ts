@@ -1,6 +1,6 @@
 // ============ 可选 TTS（OpenAI audio/speech 协议） ============
 
-import { getConfig } from './store';
+import { getConfig, isMaskedKey } from './store';
 import { normalizeBaseUrl } from './utils';
 
 export async function synthesizeSpeech(text: string): Promise<string> {
@@ -39,7 +39,7 @@ export async function testTtsConnection(override?: {
 }): Promise<{ ok: boolean; message: string; audioDataUrl?: string }> {
   const { tts } = getConfig();
   const baseUrl = normalizeBaseUrl(override?.baseUrl || tts.baseUrl);
-  const apiKey = override?.apiKey || tts.apiKey;
+  const apiKey = override?.apiKey && !isMaskedKey(override.apiKey) ? override.apiKey : tts.apiKey;
   const model = override?.model || tts.model;
   const voice = override?.voice || tts.voice;
 
@@ -86,7 +86,7 @@ export async function listTtsOptions(override?: {
 }): Promise<{ models: string[]; voices: string[] }> {
   const { tts } = getConfig();
   const baseUrl = normalizeBaseUrl(override?.baseUrl || tts.baseUrl);
-  const apiKey = override?.apiKey || tts.apiKey;
+  const apiKey = override?.apiKey && !isMaskedKey(override.apiKey) ? override.apiKey : tts.apiKey;
 
   if (!apiKey) {
     return { models: DEFAULT_TTS_MODELS, voices: DEFAULT_TTS_VOICES };

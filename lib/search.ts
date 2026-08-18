@@ -2,7 +2,7 @@
 // 通过搜索服务商获取网页结果，拼装成受限长度的“研究上下文”并注入提示词，
 // 让大模型基于最新数据撰写文稿，而不是只依赖训练时固化的知识。
 
-import { getConfig } from './store';
+import { getConfig, isMaskedKey } from './store';
 import type { SearchProvider, SourceRef } from './types';
 
 export interface SearchResult {
@@ -180,7 +180,7 @@ export async function testSearchConnection(override?: {
 }): Promise<{ ok: boolean; message: string; results?: SourceRef[] }> {
   const { search } = getConfig();
   const provider = override?.provider || search.provider;
-  const apiKey = override?.apiKey || search.apiKey;
+  const apiKey = override?.apiKey && !isMaskedKey(override.apiKey) ? override.apiKey : search.apiKey;
   const maxResults = override?.maxResults ?? search.maxResults ?? 1;
 
   if (!apiKey) {

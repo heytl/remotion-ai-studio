@@ -1,7 +1,7 @@
 // ============ OpenAI 兼容 Chat Completions 客户端 ============
 // 通过配置 baseUrl / apiKey / model 即可切换任意兼容服务商。
 
-import { getConfig } from './store';
+import { getConfig, isMaskedKey } from './store';
 import { extractJson, normalizeBaseUrl } from './utils';
 
 export interface ChatMessage {
@@ -90,7 +90,7 @@ export async function testLlmConnection(override?: {
 }): Promise<{ ok: boolean; message: string; model?: string }> {
   const { llm } = getConfig();
   const baseUrl = normalizeBaseUrl(override?.baseUrl || llm.baseUrl);
-  const apiKey = override?.apiKey || llm.apiKey;
+  const apiKey = override?.apiKey && !isMaskedKey(override.apiKey) ? override.apiKey : llm.apiKey;
   const model = override?.model || llm.model;
 
   if (!apiKey) {
