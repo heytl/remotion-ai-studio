@@ -68,7 +68,8 @@ remotion-ai-studio/
 │   ├── UI-DESIGN.md            # Motion Lab UI 设计规范
 │   ├── VIDEO-GENERATION-OPTIMIZATION.md
 │   ├── PROJECT-MANAGEMENT-OPTIMIZATION.md
-│   └── REAL-TIME-SEARCH-OPTIMIZATION.md
+│   ├── REAL-TIME-SEARCH-OPTIMIZATION.md
+│   └── DEPLOYMENT.md           # 部署与运维文档
 ├── data/                       # 运行时数据（gitignore，自动创建）
 ├── Dockerfile / docker-compose.yml
 └── .env.example
@@ -119,6 +120,8 @@ npm start
 ```
 
 ## 五、Docker 部署
+
+> 完整的部署与运维文档（含环境准备、配置、启动、备份、Nginx + HTTPS、故障排查）见 [部署文档](docs/DEPLOYMENT.md)。
 
 ```bash
 # 方式一：通过环境变量注入配置
