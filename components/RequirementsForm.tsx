@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import { ArrowRight, Clock, Monitor, Palette, UsersThree } from '@phosphor-icons/react';
+import { ArrowRight, Clock, MagnifyingGlass, Monitor, Palette, UsersThree } from '@phosphor-icons/react';
 import { Project, Requirements } from '@/lib/types';
 import { Badge } from './ui/badge';
 import { Button } from './ui/button';
@@ -9,7 +9,9 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/
 import { PageHeading } from './ui/feedback';
 import { Field } from './ui/field';
 import { Input } from './ui/input';
+import { Label } from './ui/label';
 import { NativeSelect } from './ui/native-select';
+import { Switch } from './ui/switch';
 
 export type Patch = (partial: Partial<Project> | ((project: Project) => Project)) => void;
 
@@ -35,6 +37,13 @@ export const RequirementsForm: React.FC<{ project: Project; patch: Patch; onNext
               <Field label="语言"><Input value={requirements.language} onChange={(e) => set({ language: e.target.value })} /></Field>
             </div>
             <Field label="目标受众"><Input value={requirements.audience} placeholder="例如：对科技感兴趣的普通观众" onChange={(e) => set({ audience: e.target.value })} /></Field>
+            <div className="flex items-center justify-between rounded-xl border border-border/15 bg-background/35 px-3 py-2.5">
+              <Label htmlFor="enable-search" className="flex items-center gap-2 text-foreground">
+                <MagnifyingGlass className="h-4 w-4 text-indigo-200" weight="fill" aria-hidden="true" />
+                生成时联网搜索最新资料
+              </Label>
+              <Switch id="enable-search" checked={requirements.enableSearch !== false} onCheckedChange={(enabled) => set({ enableSearch: enabled })} aria-label="生成时联网搜索最新资料" />
+            </div>
             <div className="flex justify-end border-t border-border/15 pt-5"><Button disabled={!requirements.topic.trim()} onClick={onNext}>保存并进入大纲<ArrowRight className="h-4 w-4" weight="bold" /></Button></div>
           </CardContent>
         </Card>

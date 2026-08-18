@@ -12,6 +12,8 @@ export interface Requirements {
   audience: string;
   language: string;
   aspectRatio: AspectRatio;
+  /** 生成大纲/文稿时是否联网检索最新资料（默认开启，未设置时视为开启） */
+  enableSearch?: boolean;
 }
 
 /** 步骤 2：大纲 */
@@ -181,6 +183,8 @@ export interface Project {
   script: ScriptScene[];
   schema: VideoSchema | null;
   workflow: ProjectWorkflow;
+  /** 最近一次联网检索到的参考来源 */
+  sources?: SourceRef[];
 }
 
 /** 首页项目管理列表所需的轻量摘要。 */
@@ -197,7 +201,7 @@ export interface ProjectSummary {
   renderProgress?: number;
 }
 
-/** 大模型 / TTS 配置（持久化到 data/config.json，可用环境变量覆盖） */
+/** 大模型 / TTS / 搜索配置（持久化到 data/config.json，可用环境变量覆盖） */
 export interface LlmConfig {
   baseUrl: string;
   apiKey: string;
@@ -213,9 +217,26 @@ export interface TtsConfig {
   voice: string;
 }
 
+export type SearchProvider = 'tavily' | 'serper' | 'bocha';
+
+/** 联网搜索配置（生成前检索最新资料用） */
+export interface SearchConfig {
+  enabled: boolean;
+  provider: SearchProvider;
+  apiKey: string;
+  maxResults: number;
+}
+
 export interface AppConfig {
   llm: LlmConfig;
   tts: TtsConfig;
+  search: SearchConfig;
+}
+
+/** 检索到的参考来源，用于在文稿/大纲中展示与核对 */
+export interface SourceRef {
+  title: string;
+  url: string;
 }
 
 /** 渲染任务 */

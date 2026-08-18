@@ -2,9 +2,30 @@
 
 import { OutlineScene, Requirements, ScriptScene } from './types';
 
+function todayStr(): string {
+  return new Date().toLocaleDateString('zh-CN', {
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric',
+    weekday: 'long',
+  });
+}
+
+/** 把检索到的最新资料拼接成可注入提示词的文本块；无资料时返回空字符串 */
+function researchBlock(research?: string): string {
+  if (!research) return '';
+  return [
+    '【最新联网检索资料】',
+    '以下是针对该主题刚刚检索到的最新网页资料，请优先基于其中的事实、数据与观点组织内容，并在合适处标注来源标题或 URL。',
+    '若资料不足或相互矛盾，请保守处理并明确说明不确定，禁止编造具体数字或引用未经验证的事实。',
+    research,
+  ].join('\n');
+}
+
 export function outlineSystemPrompt(): string {
   return [
     '你是一名专业的视频策划与导演。根据用户给出的需求，规划视频的结构化大纲。',
+    `今天是 ${todayStr()}。当需求涉及时效性信息（新闻、行情、数据、最新动态）时，请以用户提供的联网检索资料为优先依据，避免使用过时数据。`,
     '要求：',
     '1. 大纲包含若干个"章节/场景"，覆盖视频从开头到结尾的完整叙事。',
     '2. 每个场景包含：标题(title)、核心要点(keyPoints，字符串数组)、时长占比(durationShare，整数百分比)。',
@@ -16,7 +37,7 @@ export function outlineSystemPrompt(): string {
   ].join('\n');
 }
 
-export function outlineUserPrompt(req: Requirements): string {
+export function outlineUserPrompt(req: Requirements, research?: string): string {
   return [
     '请为以下视频需求生成大纲：',
     JSON.stringify(
@@ -31,21 +52,24 @@ export function outlineUserPrompt(req: Requirements): string {
       null,
       2
     ),
+    researchBlock(research),
     '请输出 JSON。',
-  ].join('\n');
+  ].filter(Boolean).join('\n');
 }
 
-export function outlineSceneUserPrompt(req: Requirements, current: OutlineScene): string {
+export function outlineSceneUserPrompt(req: Requirements, current: OutlineScene, research?: string): string {
   return [
     '请为以下视频需求，重新生成其中某一个场景的大纲（保持原场景标题风格与整体连贯性）：',
     JSON.stringify({ requirements: req, currentScene: current }, null, 2),
+    researchBlock(research),
     '只输出一个场景对象的 JSON，格式：{"title":"...","keyPoints":["..."],"durationShare":数字}',
-  ].join('\n');
+  ].filter(Boolean).join('\n');
 }
 
 export function scriptSystemPrompt(): string {
   return [
     '你是一名专业的视频导演、信息设计师和分镜脚本撰写人。基于大纲生成可直接执行的结构化视频分镜。',
+    `今天是 ${todayStr()}。若用户提供了联网检索资料，请优先基于其中的最新事实、数据与观点撰写旁白，并在旁白或画面要点中自然引用关键数据；不得编造检索资料中不存在的具体数字。`,
     '要求：',
     '1. 每个场景输出 title、narration、visual、bullets、durationSeconds、sceneType、beats、visualPlan。',
     '2. sceneType 取值：title、bullets、imageText、caption、transition。第一个必须为 title；普通场景控制在 4-8 秒。',
@@ -65,7 +89,8 @@ export function scriptSystemPrompt(): string {
 
 export function scriptUserPrompt(
   req: Requirements,
-  outline: OutlineScene[]
+  outline: OutlineScene[],
+  research?: string
 ): string {
   return [
     '请为以下大纲撰写逐场景视频文稿：',
@@ -81,14 +106,16 @@ export function scriptUserPrompt(
       null,
       2
     ),
+    researchBlock(research),
     '请输出 JSON。',
-  ].join('\n');
+  ].filter(Boolean).join('\n');
 }
 
 export function scriptSceneUserPrompt(
   req: Requirements,
   scene: ScriptScene,
-  outlineTitle: string
+  outlineTitle: string,
+  research?: string
 ): string {
   return [
     '请为以下视频，重新生成其中某一个场景的文稿（分镜脚本），保持整体风格一致：',
@@ -109,6 +136,7 @@ export function scriptSceneUserPrompt(
       null,
       2
     ),
+    researchBlock(research),
     '沿用系统要求的 beats 与 visualPlan 结构。只输出一个完整场景对象 JSON，不要解释。',
-  ].join('\n');
+  ].filter(Boolean).join('\n');
 }

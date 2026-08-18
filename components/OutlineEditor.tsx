@@ -3,7 +3,7 @@
 import React, { useState } from 'react';
 import { ArrowDown, ArrowRight, ArrowUp, ArrowsClockwise, DotsSixVertical, ListBullets, Plus, Sparkle, Trash } from '@phosphor-icons/react';
 import { apiPost } from '@/lib/api';
-import { OutlineScene, Project } from '@/lib/types';
+import { OutlineScene, Project, SourceRef } from '@/lib/types';
 import { parseLines, toLines, uid } from '@/lib/utils';
 import { Button } from './ui/button';
 import { Card, CardContent } from './ui/card';
@@ -12,6 +12,7 @@ import { Field } from './ui/field';
 import { Input } from './ui/input';
 import { Textarea } from './ui/textarea';
 import { Patch } from './RequirementsForm';
+import { SourceList } from './SourceList';
 import { cn } from '@/lib/cn';
 
 export const OutlineEditor: React.FC<{ project: Project; patch: Patch; onNext: () => void }> = ({ project, patch, onNext }) => {
@@ -30,7 +31,7 @@ export const OutlineEditor: React.FC<{ project: Project; patch: Patch; onNext: (
   };
   const generateAll = async () => {
     setLoading(true); setError(null);
-    try { const data = await apiPost<{ outline: OutlineScene[] }>('/api/generate/outline', { projectId: project.id }); patch({ outline: data.outline }); }
+    try { const data = await apiPost<{ outline: OutlineScene[]; sources?: SourceRef[] }>('/api/generate/outline', { projectId: project.id }); patch({ outline: data.outline, sources: data.sources || [] }); }
     catch (e) { setError((e as Error).message); }
     finally { setLoading(false); }
   };
@@ -45,6 +46,7 @@ export const OutlineEditor: React.FC<{ project: Project; patch: Patch; onNext: (
     <div className="mx-auto max-w-5xl space-y-6">
       <PageHeading eyebrow="Step 02 · Narrative architecture" title="规划视频大纲" description="生成结构化叙事，再通过排序、时长占比和要点编辑校准故事节奏。" actions={<Button loading={loading} onClick={generateAll}><Sparkle className="h-4 w-4" weight="fill" />{scenes.length ? '重新生成全部' : '生成大纲'}</Button>} />
       <ErrorBanner message={error} onClose={() => setError(null)} />
+      <SourceList sources={project.sources} />
 
       {loading && scenes.length === 0 && <Card className="flex min-h-56 items-center justify-center gap-3 text-sm text-muted-foreground"><Spinner />正在构建叙事大纲…</Card>}
       {!loading && scenes.length === 0 && <EmptyState icon={<ListBullets className="h-6 w-6" />} title="还没有大纲" description="AI 会根据创作需求生成结构化场景和时长建议。" action={<Button onClick={generateAll}><Sparkle className="h-4 w-4" weight="fill" />生成大纲</Button>} />}

@@ -3,7 +3,7 @@
 import React, { useState } from 'react';
 import { ArrowDown, ArrowRight, ArrowUp, ArrowsClockwise, Article, Plus, SpeakerHigh, Sparkle, Trash, Waveform } from '@phosphor-icons/react';
 import { apiPost } from '@/lib/api';
-import { Project, SceneType, ScriptScene, VisualLayout } from '@/lib/types';
+import { Project, SceneType, ScriptScene, SourceRef, VisualLayout } from '@/lib/types';
 import { getMinimumSceneDuration, VIDEO_LAYOUT_OPTIONS } from '@/lib/video-planner';
 import { formatSeconds, parseLines, toLines, uid } from '@/lib/utils';
 import { Badge } from './ui/badge';
@@ -15,6 +15,7 @@ import { Input } from './ui/input';
 import { NativeSelect } from './ui/native-select';
 import { Textarea } from './ui/textarea';
 import { Patch } from './RequirementsForm';
+import { SourceList } from './SourceList';
 
 const SCENE_TYPES: Array<{ value: SceneType; label: string }> = [
   { value: 'title', label: '片头标题' }, { value: 'bullets', label: '要点列表' }, { value: 'imageText', label: '图文' }, { value: 'caption', label: '纯字幕' }, { value: 'transition', label: '转场' },
@@ -40,7 +41,7 @@ export const ScriptEditor: React.FC<{ project: Project; patch: Patch; onNext: ()
 
   const updateScene = (index: number, partial: Partial<ScriptScene>) => { const next = scenes.slice(); next[index] = { ...next[index], ...partial }; patch({ script: next }); };
   const moveScene = (from: number, to: number) => { if (to < 0 || to >= scenes.length || from === to) return; const next = scenes.slice(); const [item] = next.splice(from, 1); next.splice(to, 0, item); patch({ script: next }); };
-  const generateAll = async () => { setLoading(true); setError(null); try { const data = await apiPost<{ script: ScriptScene[] }>('/api/generate/script', { projectId: project.id }); patch({ script: data.script }); } catch (e) { setError((e as Error).message); } finally { setLoading(false); } };
+  const generateAll = async () => { setLoading(true); setError(null); try { const data = await apiPost<{ script: ScriptScene[]; sources?: SourceRef[] }>('/api/generate/script', { projectId: project.id }); patch({ script: data.script, sources: data.sources || [] }); } catch (e) { setError((e as Error).message); } finally { setLoading(false); } };
   const regenerate = async (index: number) => { setRegenerating(index); setError(null); try { const data = await apiPost<{ scene: ScriptScene }>('/api/generate/script/scene', { projectId: project.id, sceneIndex: index }); updateScene(index, data.scene); } catch (e) { setError((e as Error).message); } finally { setRegenerating(null); } };
   const generateTts = async (index: number) => { const scene = scenes[index]; if (!scene.narration.trim()) { setError('该场景没有旁白文本，无法生成配音'); return; } setTtsIndex(index); setError(null); try { const data = await apiPost<{ audioDataUrl: string }>('/api/tts', { text: scene.narration }); const audioDurationSeconds = await getAudioDuration(data.audioDataUrl); updateScene(index, { audioDataUrl: data.audioDataUrl, audioDurationSeconds, durationSeconds: Math.max(scene.durationSeconds, Math.ceil((audioDurationSeconds + 0.35) * 10) / 10) }); } catch (e) { setError((e as Error).message); } finally { setTtsIndex(null); } };
   const generateAllTts = async () => { setTtsAll(true); setError(null); try { const nextScenes = [...scenes]; for (let index = 0; index < scenes.length; index++) { if (!scenes[index].narration.trim()) continue; setTtsIndex(index); const data = await apiPost<{ audioDataUrl: string }>('/api/tts', { text: scenes[index].narration }); const audioDurationSeconds = await getAudioDuration(data.audioDataUrl); nextScenes[index] = { ...nextScenes[index], audioDataUrl: data.audioDataUrl, audioDurationSeconds, durationSeconds: Math.max(nextScenes[index].durationSeconds, Math.ceil((audioDurationSeconds + 0.35) * 10) / 10) }; patch({ script: [...nextScenes] }); } } catch (e) { setError((e as Error).message); } finally { setTtsIndex(null); setTtsAll(false); } };
@@ -49,6 +50,7 @@ export const ScriptEditor: React.FC<{ project: Project; patch: Patch; onNext: ()
     <div className="mx-auto max-w-5xl space-y-6">
       <PageHeading eyebrow="Step 03 · Storyboard script" title="编写分镜文稿" description="逐场景校准旁白、视觉描述、镜头类型和节奏，并可为每段旁白生成音轨。" actions={<><Button variant="outline" loading={ttsAll} disabled={!scenes.length} onClick={generateAllTts}><SpeakerHigh className="h-4 w-4" weight="fill" />全部配音</Button><Button loading={loading} onClick={generateAll}><Sparkle className="h-4 w-4" weight="fill" />{scenes.length ? '重新生成全部' : '生成文稿'}</Button></>} />
       <ErrorBanner message={error} onClose={() => setError(null)} />
+      <SourceList sources={project.sources} />
       {loading && scenes.length === 0 && <Card className="flex min-h-56 items-center justify-center gap-3 text-sm text-muted-foreground"><Spinner />正在撰写分镜脚本…</Card>}
       {!loading && scenes.length === 0 && <EmptyState icon={<Article className="h-6 w-6" />} title="还没有分镜文稿" description="完成大纲后，让 AI 为每个场景生成旁白和视觉建议。" action={<Button onClick={generateAll}><Sparkle className="h-4 w-4" weight="fill" />生成文稿</Button>} />}
 

@@ -59,6 +59,12 @@ export const DEFAULT_CONFIG: AppConfig = {
     model: 'tts-1',
     voice: 'alloy',
   },
+  search: {
+    enabled: false,
+    provider: 'tavily',
+    apiKey: '',
+    maxResults: 5,
+  },
 };
 
 /** 环境变量覆盖 config.json 中的对应字段 */
@@ -77,6 +83,13 @@ function applyEnvOverrides(config: AppConfig): AppConfig {
   if (env.TTS_API_KEY) next.tts.apiKey = env.TTS_API_KEY;
   if (env.TTS_MODEL) next.tts.model = env.TTS_MODEL;
   if (env.TTS_VOICE) next.tts.voice = env.TTS_VOICE;
+  if (env.SEARCH_ENABLED) next.search.enabled = env.SEARCH_ENABLED === 'true' || env.SEARCH_ENABLED === '1';
+  if (env.SEARCH_PROVIDER === 'tavily' || env.SEARCH_PROVIDER === 'serper') next.search.provider = env.SEARCH_PROVIDER;
+  if (env.SEARCH_API_KEY) next.search.apiKey = env.SEARCH_API_KEY;
+  if (env.SEARCH_MAX_RESULTS) {
+    const n = Number(env.SEARCH_MAX_RESULTS);
+    if (!Number.isNaN(n)) next.search.maxResults = n;
+  }
   return next;
 }
 
@@ -85,6 +98,7 @@ export function getConfig(): AppConfig {
   const merged: AppConfig = {
     llm: { ...DEFAULT_CONFIG.llm, ...(raw.llm || {}) },
     tts: { ...DEFAULT_CONFIG.tts, ...(raw.tts || {}) },
+    search: { ...DEFAULT_CONFIG.search, ...(raw.search || {}) },
   };
   return applyEnvOverrides(merged);
 }
@@ -103,6 +117,7 @@ const DEFAULT_REQUIREMENTS: Requirements = {
   audience: '大众',
   language: '中文',
   aspectRatio: '16:9',
+  enableSearch: true,
 };
 
 export function createProject(requirements: Partial<Requirements>): Project {
@@ -127,6 +142,7 @@ export function getProject(id: string): Project | null {
   if (!p) return null;
   return {
     ...p,
+    requirements: { ...DEFAULT_REQUIREMENTS, ...p.requirements },
     outline: p.outline || [],
     script: p.script || [],
     schema: p.schema ? normalizeVideoSchema(p.schema) : null,

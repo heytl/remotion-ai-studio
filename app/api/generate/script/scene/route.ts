@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { chatJSON } from '@/lib/llm';
 import { scriptSceneUserPrompt, scriptSystemPrompt } from '@/lib/prompts';
+import { researchTopic } from '@/lib/search';
 import { getProject, saveProject } from '@/lib/store';
 import { SceneType } from '@/lib/types';
 import { isRecord } from '@/lib/utils';
@@ -10,17 +11,26 @@ const VALID_TYPES: SceneType[] = ['title', 'bullets', 'imageText', 'caption', 't
 
 export async function POST(req: NextRequest) {
   try {
-    const { projectId, sceneIndex } = (await req.json()) as { projectId: string; sceneIndex: number };
+    const { projectId, sceneIndex, enableSearch } = (await req.json()) as {
+      projectId: string;
+      sceneIndex: number;
+      enableSearch?: boolean;
+    };
     const project = getProject(projectId);
     if (!project) return NextResponse.json({ error: '项目不存在' }, { status: 404 });
     const current = project.script[sceneIndex];
     if (!current) return NextResponse.json({ error: '场景不存在' }, { status: 404 });
     const outlineTitle = project.outline[sceneIndex]?.title || current.title;
 
+    const research = await researchTopic(
+      project.requirements.topic,
+      enableSearch ?? project.requirements.enableSearch ?? true
+    );
+
     const data = await chatJSON<Record<string, unknown>>(
       [
         { role: 'system', content: scriptSystemPrompt() },
-        { role: 'user', content: scriptSceneUserPrompt(project.requirements, current, outlineTitle) },
+        { role: 'user', content: scriptSceneUserPrompt(project.requirements, current, outlineTitle, research?.context) },
       ],
       { temperature: 0.8 }
     );

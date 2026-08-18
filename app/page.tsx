@@ -3,7 +3,7 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { ArrowRight, Clock, FilmSlate, MagicWand, MonitorPlay, Stack, Trash, VideoCamera } from '@phosphor-icons/react';
+import { ArrowRight, Clock, FilmSlate, MagicWand, MagnifyingGlass, MonitorPlay, Stack, Trash, VideoCamera } from '@phosphor-icons/react';
 import { apiDelete, apiGet, apiPost } from '@/lib/api';
 import { Project, ProjectStatus, ProjectSummary, Requirements } from '@/lib/types';
 import { StudioShell } from '@/components/StudioShell';
@@ -13,8 +13,10 @@ import { Card } from '@/components/ui/card';
 import { ErrorBanner, EmptyState, SuccessBanner } from '@/components/ui/feedback';
 import { Field } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import { NativeSelect } from '@/components/ui/native-select';
 import { Progress } from '@/components/ui/progress';
+import { Switch } from '@/components/ui/switch';
 
 const STYLES = ['科普', '营销', '故事化', '教程', '产品宣传', 'Vlog'];
 const STEP_LABELS = ['需求设置', '大纲编辑', '文稿编辑', '视频预览', '导出视频'];
@@ -33,7 +35,7 @@ export default function HomePage() {
   const router = useRouter();
   const [projects, setProjects] = useState<ProjectSummary[]>([]);
   const [form, setForm] = useState<Requirements>({
-    topic: '', durationSeconds: 60, style: '科普', audience: '大众', language: '中文', aspectRatio: '16:9',
+    topic: '', durationSeconds: 60, style: '科普', audience: '大众', language: '中文', aspectRatio: '16:9', enableSearch: true,
   });
   const [creating, setCreating] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
@@ -142,6 +144,14 @@ export default function HomePage() {
               <Field label="语言">
                 <Input value={form.language} onChange={(e) => setForm({ ...form, language: e.target.value })} />
               </Field>
+            </div>
+
+            <div className="mt-4 flex items-center justify-between rounded-xl border border-border/15 bg-background/35 px-3 py-2.5">
+              <Label htmlFor="enable-search" className="flex items-center gap-2 text-foreground">
+                <MagnifyingGlass className="h-4 w-4 text-indigo-200" weight="fill" aria-hidden="true" />
+                生成时联网搜索最新资料
+              </Label>
+              <Switch id="enable-search" checked={form.enableSearch !== false} onCheckedChange={(enabled) => setForm({ ...form, enableSearch: enabled })} aria-label="生成时联网搜索最新资料" />
             </div>
 
             <div className="mt-auto flex flex-col gap-4 pt-6 sm:flex-row sm:items-end">

@@ -48,7 +48,7 @@ export const PreviewEditor: React.FC<{ project: Project; patch: Patch; onNext: (
         <div className="min-w-0 space-y-4">
           <PreviewPlayer schema={schema} playerRef={playerRef} />
           <Card className={schema.qualityReport.score >= 90 ? 'border-emerald-400/20' : 'border-amber-400/20'}>
-            <CardContent className="flex flex-col gap-4 p-4 sm:flex-row sm:items-center sm:justify-between">
+            <CardContent className="flex flex-col gap-4 p-4 sm:flex-row sm:items-center sm:justify-between sm:p-4">
               <div className="flex items-center gap-3">{schema.qualityReport.score >= 90 ? <CheckCircle className="h-6 w-6 text-emerald-300" weight="fill" /> : <WarningCircle className="h-6 w-6 text-amber-300" weight="fill" />}<div><p className="text-sm font-semibold">生成质量 {schema.qualityReport.score} / 100</p><p className="mt-1 text-xs text-muted-foreground">{schema.qualityReport.metrics.totalBeats} 个视觉节拍 · {schema.qualityReport.metrics.layoutVariety} 种版式 · 平均 {schema.qualityReport.metrics.averageVisualElements} 个视觉元素</p></div></div>
               <div className="flex flex-wrap gap-2">{schema.qualityReport.issues.slice(0, 3).map((issue) => <Badge key={`${issue.code}-${issue.sceneId || ''}`} variant={issue.severity === 'error' ? 'destructive' : 'outline'} title={issue.suggestion}>{issue.message}</Badge>)}{schema.qualityReport.issues.length === 0 ? <Badge variant="secondary">全部检查通过</Badge> : null}</div>
             </CardContent>
