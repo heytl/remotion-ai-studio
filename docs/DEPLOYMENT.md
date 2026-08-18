@@ -1,105 +1,45 @@
 # 部署文档
 
 > 适用范围：Remotion AI Studio（`remotion-ai-studio`）
-> 部署方式：Docker Compose（单机 / 单容器）
+> 支持两种部署方式：**本地部署（Node.js）** 与 **Docker 部署**，二选一。
 > 最后更新：2026-08-18
 
-本文档覆盖从零开始把项目部署到一台远程 Linux 服务器的完整流程，以及上线后的运维、更新、备份、故障排查与安全加固。
+本文档覆盖从获取代码到上线运维的完整流程，以及更新、备份、故障排查与安全加固。
 
 ---
 
 ## 目录
 
-1. [部署架构](#一部署架构)
-2. [环境要求](#二环境要求)
-3. [准备工作：安装 Docker](#三准备工作安装-docker)
-4. [获取代码](#四获取代码)
-5. [配置服务密钥](#五配置服务密钥)
-6. [构建与启动](#六构建与启动)
-7. [首次访问与配置](#七首次访问与配置)
-8. [验证部署](#八验证部署)
-9. [更新与升级](#九更新与升级)
-10. [数据持久化与备份](#十数据持久化与备份)
-11. [常用运维命令](#十一常用运维命令)
-12. [可选：Nginx 反向代理 + HTTPS](#十二可选nginx-反向代理--https)
-13. [安全加固建议](#十三安全加固建议)
-14. [常见问题排查](#十四常见问题排查)
-15. [附录：配置项速查表](#十五附录配置项速查表)
+1. [两种部署方式对比](#一两种部署方式对比)
+2. [获取代码](#二获取代码)
+3. [方式 A：本地部署（Node.js）](#三方式-a本地部署nodejs)
+4. [方式 B：Docker 部署](#四方式-bdocker-部署)
+5. [首次访问与配置](#五首次访问与配置)
+6. [验证部署](#六验证部署)
+7. [更新与升级](#七更新与升级)
+8. [数据持久化与备份](#八数据持久化与备份)
+9. [常用运维命令](#九常用运维命令)
+10. [可选：Nginx 反向代理 + HTTPS](#十可选nginx-反向代理--https)
+11. [安全加固建议](#十一安全加固建议)
+12. [常见问题排查](#十二常见问题排查)
+13. [附录：配置项速查表](#十三附录配置项速查表)
 
 ---
 
-## 一、部署架构
+## 一、两种部署方式对比
 
-```
-用户浏览器
-    │  http/https :3000
-    ▼
-Nginx（可选，反向代理 + HTTPS）
-    │
-    ▼
-Docker 容器 remotion-ai-studio
-    ├── Next.js 15（前端 + API 同容器）
-    ├── Remotion 渲染器（Chrome Headless Shell）
-    └── 数据目录 /app/data（挂载到命名卷，持久化）
-            ├── config.json      # 界面保存的配置
-            ├── projects/        # 项目（大纲/文稿/Schema）
-            └── renders/         # 渲染任务与 MP4 产物
-
-外部服务（由服务器出网调用）：
-    ├── 大模型（OpenAI 兼容，如 DeepSeek）
-    ├── TTS（OpenAI audio/speech 协议）
-    └── 联网搜索（Tavily / Serper / Bocha 博查）
-```
-
-关键点：
-
-- **无数据库**：所有数据存本地 JSON 文件，落在命名卷 `remotion-ai-studio-data`。
-- **配置优先级**：环境变量 > 界面/文件配置（`data/config.json`）。
-- **渲染队列**：单进程内存队列，一次渲染一个任务；服务重启后未完成任务标记为失败。
-
----
-
-## 二、环境要求
-
-| 项目 | 最低要求 | 推荐 |
+| | 本地部署（Node.js） | Docker 部署 |
 | --- | --- | --- |
-| 操作系统 | Linux（Ubuntu / Debian / CentOS） | Ubuntu 22.04+ |
-| CPU | 2 核 | 4 核 |
-| 内存 | 2 GB（渲染 MP4 较吃内存） | 4 GB |
-| 磁盘 | 10 GB 可用（含镜像、依赖、视频产物） | 20 GB+ |
-| 网络 | 可访问外网（拉镜像 + 调用 LLM/TTS/搜索 API） | — |
-| Docker | 20.10+，含 Docker Compose v2 | 最新版 |
+| 前置依赖 | Node.js ≥ 18 + npm | Docker + Docker Compose |
+| 优点 | 不依赖 Docker、启动快、便于调试 | 环境隔离、一键启动、中文字体与渲染系统库已内置 |
+| 缺点 | 需自行准备 Node、字体等 | 镜像较大、首次构建较慢 |
+| 适用场景 | 本地体验、开发调试 | 生产环境、远程服务器 |
 
-> ⚠️ 内存不足 2GB 时，长视频渲染可能失败或极慢；可适当缩短视频时长。
+> 远程服务器生产环境**推荐 Docker 部署**。
 
 ---
 
-## 三、准备工作：安装 Docker
-
-SSH 登录服务器，执行：
-
-```bash
-curl -fsSL https://get.docker.com | sh
-```
-
-给当前用户授权（避免每次 `sudo`）：
-
-```bash
-sudo usermod -aG docker $USER
-```
-
-**退出 SSH 重新登录一次**，然后验证：
-
-```bash
-docker --version
-docker compose version
-```
-
-> 若 `docker compose` 不可用，老版本用 `docker-compose`（带横杠），后文命令对应替换。
-
----
-
-## 四、获取代码
+## 二、获取代码
 
 ### 方式 A：Git 克隆（推荐）
 
@@ -110,90 +50,141 @@ cd remotion-ai-studio
 
 ### 方式 B：上传压缩包（服务器访问不了 GitHub 时）
 
-在你**本地电脑**打包（Windows PowerShell 下把 `tar` 换成 `tar.exe`）：
+本地打包（Windows 下 `tar` 换成 `tar.exe`）：
 
 ```bash
-# 排除 node_modules、.git、运行时数据
 tar --exclude=node_modules --exclude=.git --exclude=data -czf studio.tar.gz .
 ```
 
-上传并解压到服务器：
+上传解压：
 
 ```bash
 scp studio.tar.gz 用户名@服务器IP:/opt/
 # 服务器上：
-cd /opt
-mkdir -p remotion-ai-studio
-tar -xzf studio.tar.gz -C remotion-ai-studio
+cd /opt && mkdir -p remotion-ai-studio && tar -xzf studio.tar.gz -C remotion-ai-studio
 cd remotion-ai-studio
 ```
 
-> 上传完成后务必检查源码完整：`ls app components lib remotion` 四个目录都应存在且包含文件。
+> 上传完成后务必检查源码完整：`ls app components lib remotion` 四个目录都应存在且含文件。
 
 ---
 
-## 五、配置服务密钥
+## 三、方式 A：本地部署（Node.js）
 
-在项目根目录（与 `docker-compose.yml` 同级）创建 `.env` 文件：
+### 3.1 环境要求
+
+- Node.js ≥ 18（推荐 20 / 22）
+- npm
+- 首次渲染 MP4 时 Remotion 会自动下载 Chrome Headless Shell（需能访问外网）
+- Linux 若渲染中文，建议安装 CJK 字体（如 `fonts-noto-cjk`）
+
+### 3.2 配置环境变量
+
+复制示例环境变量文件并修改：
 
 ```bash
-nano .env
+cp .env.example .env.local
+nano .env.local
 ```
 
-粘贴以下内容并**替换成你自己的 Key**：
+按需修改以下字段（`.env.example` 里均有注释说明）：
 
 ```bash
-# ============ 大模型（OpenAI 兼容） ============
+# 大模型
 LLM_BASE_URL=https://api.deepseek.com
 LLM_API_KEY=sk-你的大模型key
 LLM_MODEL=deepseek-v4-flash
-LLM_TEMPERATURE=0.7
 
-# ============ TTS（OpenAI audio/speech 协议） ============
+# TTS（可选）
 TTS_ENABLED=true
 TTS_BASE_URL=https://tts.321666.xyz/v1
 TTS_API_KEY=sk-tts-你的tts-key
 TTS_MODEL=tts-1
 TTS_VOICE=alloy
 
-# ============ 联网搜索 ============
+# 联网搜索（可选）
 SEARCH_ENABLED=true
-# 国内网络推荐 bocha 或 serper（tavily 可能被墙）
 SEARCH_PROVIDER=bocha
 SEARCH_API_KEY=sk-你的搜索key
 SEARCH_MAX_RESULTS=5
 ```
 
-说明：
+> 也可以不配环境变量，启动后在网页「设置」页填写，数据会保存到 `data/config.json`。
 
-- `.env` 会被 Docker Compose 自动读取，**不会提交到仓库**（已在 `.gitignore`）。
-- 含 `$`、`#` 等特殊字符的值请加引号。
-- 也可以不写 `.env`，启动后在网页「设置」页填（数据会存进容器卷），但 `.env` 更适合自动化部署。
+### 3.3 安装依赖
 
-保存：`Ctrl+O` 回车 → `Ctrl+X` 退出。
+```bash
+npm install
+```
+
+### 3.4 构建与启动
+
+生产模式：
+
+```bash
+npm run build
+npm start
+```
+
+默认监听 `http://localhost:3000`。开发模式用 `npm run dev`。
 
 ---
 
-## 六、构建与启动
+## 四、方式 B：Docker 部署
+
+> 前置条件：服务器已安装 Docker 与 Docker Compose（安装方法见 Docker 官方文档，本文不再赘述）。
+
+### 4.1 环境要求
+
+| 项目 | 最低要求 | 推荐 |
+| --- | --- | --- |
+| CPU | 2 核 | 4 核 |
+| 内存 | 2 GB（渲染 MP4 较吃内存） | 4 GB |
+| 磁盘 | 10 GB 可用 | 20 GB+ |
+| 网络 | 可访问外网（拉镜像 + 调用 LLM/TTS/搜索 API） | — |
+
+### 4.2 配置环境变量
+
+复制示例环境变量文件并修改（Docker Compose 会**自动读取同目录的 `.env`**）：
+
+```bash
+cp .env.example .env
+nano .env
+```
+
+修改 `.env.example` 里带 `sk-...` 占位符的字段即可，例如：
+
+```bash
+# 大模型
+LLM_BASE_URL=https://api.deepseek.com
+LLM_API_KEY=sk-你的大模型key
+LLM_MODEL=deepseek-v4-flash
+
+# TTS（可选）
+TTS_ENABLED=true
+TTS_BASE_URL=https://tts.321666.xyz/v1
+TTS_API_KEY=sk-tts-你的tts-key
+
+# 联网搜索（可选）
+SEARCH_ENABLED=true
+SEARCH_PROVIDER=bocha
+SEARCH_API_KEY=sk-你的搜索key
+```
+
+> 也可以不配 `.env`，启动后在网页「设置」页填写（数据存入容器卷 `remotion-ai-studio-data`）。
+
+### 4.3 构建与启动
 
 ```bash
 docker compose up -d --build
 ```
 
-- 首次构建需要拉镜像、装依赖、跑 `next build`，**通常 3–10 分钟**，请耐心等待。
-- `-d` 表示后台运行。
-
-查看构建/启动日志：
-
-```bash
-docker compose logs -f
-```
-
-看到类似 `Ready` / `started server on 0.0.0.0:3000` 即启动成功。按 `Ctrl+C` 退出日志（**不会停止服务**）。
+- 首次构建需拉镜像、装依赖、跑 `next build`，**通常 3–10 分钟**，请耐心等待。
+- 查看日志：`docker compose logs -f`，看到 `Ready` / `started server on 0.0.0.0:3000` 即成功。
 
 ---
 
-## 七、首次访问与配置
+## 五、首次访问与配置
 
 浏览器访问：
 
@@ -201,31 +192,26 @@ docker compose logs -f
 http://你的服务器IP:3000
 ```
 
-若打不开，先放行端口（见下方）。
-
-### 放行 3000 端口
+打不开时先放行端口：
 
 ```bash
 # Ubuntu / Debian 防火墙
 sudo ufw allow 3000
 ```
 
-**云服务器（阿里云/腾讯云/华为云等）还需在控制台「安全组」放行 3000 端口**，否则外网进不来。
+> **云服务器（阿里云/腾讯云/华为云等）还需在控制台「安全组」放行 3000 端口**。
 
-### 首次配置
+进入「设置」页（右上角齿轮），确认/填写「大模型」「TTS」「联网搜索」三块，并逐个点「测试连接」：
 
-1. 点右上角齿轮进「设置」。
-2. 分别确认/填写「大模型」「TTS」「联网搜索」三块（若已用 `.env`，会自动带出，无需重填）。
-3. 每块点「测试连接」：
-   - 大模型 → 「连接成功」
-   - TTS → 「连接成功」并可试听
-   - 搜索 → 「连接成功，返回 N 条结果」
+- 大模型 → 「连接成功」
+- TTS → 「连接成功」并可试听
+- 搜索 → 「连接成功，返回 N 条结果」
 
-> 某个服务测试失败，说明**服务器访问不到该 API**，见 [常见问题排查](#十四常见问题排查)。
+> 若某服务测试失败，说明服务器访问不到该 API，见 [常见问题排查](#十二常见问题排查)。
 
 ---
 
-## 八、验证部署
+## 六、验证部署
 
 走一遍完整流程：
 
@@ -235,46 +221,54 @@ sudo ufw allow 3000
 
 ---
 
-## 九、更新与升级
+## 七、更新与升级
 
-代码更新后（你本地 push 了新提交），在服务器上：
+### 本地部署
 
 ```bash
-cd /opt/remotion-ai-studio    # 你的项目目录
-git pull                      # 拉最新代码
-docker compose up -d --build  # 重新构建并重启
+cd remotion-ai-studio
+git pull
+npm install
+npm run build
+# 重启服务（Ctrl+C 停掉旧进程后）
+npm start
 ```
 
-- 项目数据、配置、导出视频都在命名卷 `remotion-ai-studio-data` 里，**重新构建不会丢**。
-- 若构建出现依赖/缓存异常，加 `--no-cache` 强制全新构建：
+### Docker 部署
+
+```bash
+cd remotion-ai-studio
+git pull
+docker compose up -d --build
+```
+
+- 构建异常时加 `--no-cache` 强制全新构建：
 
 ```bash
 docker compose build --no-cache
 docker compose up -d
 ```
 
+- 重新构建**不会丢数据**（数据在卷/`data` 目录中）。
+
 ---
 
-## 十、数据持久化与备份
+## 八、数据持久化与备份
 
-### 数据都在哪
+### 数据存放位置
 
-所有运行时数据在命名卷 `remotion-ai-studio-data`（容器内 `/app/data`）：
-
-```
-data/
-├── config.json       # 界面保存的配置
-├── projects/         # 项目数据
-└── renders/          # 渲染任务 + 导出 MP4
-```
+| 部署方式 | 数据目录 |
+| --- | --- |
+| 本地部署 | 项目根目录 `data/`（`config.json`、`projects/`、`renders/`） |
+| Docker 部署 | 命名卷 `remotion-ai-studio-data`（容器内 `/app/data`） |
 
 ### 备份
 
-```bash
-# 查看卷挂载路径
-docker volume inspect remotion-ai-studio-data
+本地部署直接压缩 `data/` 目录即可。
 
-# 备份整卷到宿主机（示例）
+Docker 部署：
+
+```bash
 docker run --rm -v remotion-ai-studio-data:/data -v /opt/backup:/backup alpine \
   tar czf /backup/studio-data-$(date +%Y%m%d).tar.gz -C /data .
 ```
@@ -288,7 +282,16 @@ docker run --rm -v remotion-ai-studio-data:/data -v /opt/backup:/backup alpine \
 
 ---
 
-## 十一、常用运维命令
+## 九、常用运维命令
+
+### 本地部署
+
+```bash
+npm run build && npm start     # 构建并启动
+ps aux | grep next             # 查看进程
+```
+
+### Docker 部署
 
 ```bash
 docker compose ps                  # 查看容器状态
@@ -296,23 +299,15 @@ docker compose logs -f             # 实时日志
 docker compose logs --tail=100     # 最近 100 行日志
 docker compose restart             # 重启服务
 docker compose down                # 停止并删除容器（数据卷保留）
-docker compose down -v             # ⚠️ 连同数据卷一起删除（会丢数据！慎用）
-docker compose up -d               # 后台启动（复用已有镜像）
+docker compose down -v             # ⚠️ 连同数据卷删除（丢数据，慎用）
+docker compose up -d               # 后台启动（复用镜像）
 ```
 
 ---
 
-## 十二、可选：Nginx 反向代理 + HTTPS
+## 十、可选：Nginx 反向代理 + HTTPS
 
-### 安装 Nginx
-
-```bash
-sudo apt-get update && sudo apt-get install -y nginx
-```
-
-### 配置反代
-
-新建 `/etc/nginx/sites-available/studio`：
+安装 Nginx 后，新建 `/etc/nginx/sites-available/studio`：
 
 ```nginx
 server {
@@ -341,107 +336,107 @@ sudo ln -s /etc/nginx/sites-available/studio /etc/nginx/sites-enabled/
 sudo nginx -t && sudo systemctl reload nginx
 ```
 
-### 申请 HTTPS 证书（Let's Encrypt）
+申请 HTTPS 证书（Let's Encrypt）：
 
 ```bash
 sudo apt-get install -y certbot python3-certbot-nginx
 sudo certbot --nginx -d your-domain.com
 ```
 
-按提示完成即可，证书会自动续期。
-
-> 配置好 Nginx 后，可以把服务器防火墙的 3000 端口关闭，只开放 80/443，更安全。
+> 配好 Nginx 后，可关闭服务器防火墙的 3000 端口，只开放 80/443，更安全。
 
 ---
 
-## 十三、安全加固建议
+## 十一、安全加固建议
 
-1. **API Key 脱敏**：后端已对返回前端的 Key 打码（显示为 `••••••••xxxx`），F12 看不到明文；仅存在服务器 `.env` / `data/config.json`。
-2. **不要暴露 3000 到公网**：配好 Nginx 后只开放 80/443。
-3. **限制设置页访问**：如需，可在 Nginx 上对 `/settings` 加 Basic Auth 或 IP 白名单。
-4. **`.env` 权限**：`chmod 600 .env`，避免其他用户读取。
-5. **定期备份**：见 [数据持久化与备份](#十数据持久化与备份)。
-6. **密钥不进仓库**：`.env`、`data/` 均在 `.gitignore` 中，切勿手误提交。
+1. **API Key 脱敏**：后端已对返回前端的 Key 打码（显示 `••••••••xxxx`），F12 看不到明文；真实 Key 仅存服务器端。
+2. **不暴露 3000 到公网**：配好 Nginx 后只开放 80/443。
+3. **限制设置页访问**：可在 Nginx 上对 `/settings` 加 Basic Auth 或 IP 白名单。
+4. **`.env` 权限**：`chmod 600 .env`（或 `.env.local`）。
+5. **密钥不进仓库**：`.env`、`.env.local`、`data/` 均在 `.gitignore` 中，切勿误提交。
+6. **定期备份**：见 [数据持久化与备份](#八数据持久化与备份)。
 
 ---
 
-## 十四、常见问题排查
+## 十二、常见问题排查
 
-### 1. 构建报 `Module not found: Can't resolve '@/...'`
+### 1. Docker 构建报 `Module not found: Can't resolve '@/...'`
 
 - 原因：webpack 未识别 `@` 路径别名。
 - 已修复：`next.config.mjs` 显式声明了 `@` 别名。
-- 处理：确认代码为最新（`git pull`），用 `--no-cache` 重新构建。
+- 处理：`git pull` 到最新代码，`docker compose build --no-cache`。
 
-### 2. 构建报 `Cannot find module 'tailwindcss'`
+### 2. Docker 构建报 `Cannot find module 'tailwindcss'`
 
 - 原因：Dockerfile 曾在顶部设 `NODE_ENV=production`，导致 `npm ci` 跳过 devDependencies。
 - 已修复：改为构建完成后才设 `NODE_ENV=production`。
-- 处理：`git pull` 拉取修复后的 Dockerfile，再 `docker compose build --no-cache`。
+- 处理：`git pull` 拉取修复后的 Dockerfile，再重建。
 
 ### 3. 网页打不开 / 连接超时
 
 - 服务器防火墙未放行 3000（`sudo ufw allow 3000`）。
 - 云服务器「安全组」未放行 3000。
-- 检查：`docker compose ps` 容器是否 Up，`docker compose logs` 是否报错。
+- 检查：`docker compose ps`（或本地进程）是否在跑，日志是否报错。
 
 ### 4. 「测试连接」失败（大模型/TTS/搜索）
 
-- 服务器访问不到该 API（网络/墙/代理问题）。
+- 服务器访问不到该 API（网络/墙/代理）。
 - 例：Tavily 在国内常被墙，改用 `bocha` 或 `serper`。
-- 检查服务器出网：`curl -I https://api.deepseek.com`（换成对应域名）。
+- 检查出网：`curl -I https://api.deepseek.com`（换成对应域名）。
 
 ### 5. 渲染 MP4 很慢或失败
 
 - 内存/CPU 不足（建议 ≥2GB 内存、2 核）。
 - 视频过长（先试 30–60 秒）。
-- 查看日志：`docker compose logs --tail=100`。
+- 本地部署未装中文字体 / Headless Shell 下载失败。
 
 ### 6. 设置页搜索服务商不对（`.env` 配了 bocha 却显示 tavily）
 
 - 旧版本 env 解析漏了 `bocha`，已修复。
-- 处理：`git pull` 更新到最新代码后重新构建。
+- 处理：`git pull` 到最新代码后重启/重建。
 
 ### 7. 中文字体显示为方块
 
-- 镜像已内置 Noto CJK，正常不会出现；若仍出现，确认使用的是仓库自带 Dockerfile。
+- Docker 镜像已内置 Noto CJK；本地部署需自行安装 CJK 字体（如 `fonts-noto-cjk`）。
 
 ---
 
-## 十五、附录：配置项速查表
+## 十三、附录：配置项速查表
+
+> 完整模板见 `.env.example`，复制后修改即可。下表为字段说明。
 
 ### 大模型
 
-| 配置项 | 环境变量 | 默认值 |
+| 环境变量 | 说明 | 默认值 |
 | --- | --- | --- |
-| Base URL | `LLM_BASE_URL` | `https://api.openai.com/v1` |
-| API Key | `LLM_API_KEY` | 空 |
-| 模型 | `LLM_MODEL` | `gpt-4o-mini` |
-| 温度 | `LLM_TEMPERATURE` | `0.7` |
+| `LLM_BASE_URL` | API 地址（注意是否含 `/v1`） | `https://api.openai.com/v1` |
+| `LLM_API_KEY` | API Key | 空 |
+| `LLM_MODEL` | 模型名 | `gpt-4o-mini` |
+| `LLM_TEMPERATURE` | 温度 0–2 | `0.7` |
 
 ### TTS
 
-| 配置项 | 环境变量 | 默认值 |
+| 环境变量 | 说明 | 默认值 |
 | --- | --- | --- |
-| 启用 | `TTS_ENABLED` | `false` |
-| Base URL | `TTS_BASE_URL` | `https://api.openai.com/v1` |
-| API Key | `TTS_API_KEY` | 空 |
-| 模型 | `TTS_MODEL` | `tts-1` |
-| 音色 | `TTS_VOICE` | `alloy` |
+| `TTS_ENABLED` | 是否启用 | `false` |
+| `TTS_BASE_URL` | API 地址 | `https://api.openai.com/v1` |
+| `TTS_API_KEY` | API Key | 空 |
+| `TTS_MODEL` | 模型 | `tts-1` |
+| `TTS_VOICE` | 音色 | `alloy` |
 
 ### 联网搜索
 
-| 配置项 | 环境变量 | 默认值 |
+| 环境变量 | 说明 | 默认值 |
 | --- | --- | --- |
-| 启用 | `SEARCH_ENABLED` | `false` |
-| 服务商 | `SEARCH_PROVIDER` | `tavily`（可选 `tavily`/`serper`/`bocha`） |
-| API Key | `SEARCH_API_KEY` | 空 |
-| 结果数量 | `SEARCH_MAX_RESULTS` | `5` |
+| `SEARCH_ENABLED` | 是否启用 | `false` |
+| `SEARCH_PROVIDER` | `tavily` / `serper` / `bocha` | `tavily` |
+| `SEARCH_API_KEY` | API Key | 空 |
+| `SEARCH_MAX_RESULTS` | 每个查询结果数 1–10 | `5` |
 
 ### 服务
 
-| 配置项 | 环境变量 | 默认值 |
+| 环境变量 | 说明 | 默认值 |
 | --- | --- | --- |
-| 监听端口 | `PORT` | `3000` |
+| `PORT` | 监听端口 | `3000` |
 
 > 优先级：**环境变量 > 界面/文件配置（`data/config.json`）**。
