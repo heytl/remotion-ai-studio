@@ -5,8 +5,7 @@
 # ============================================================
 FROM node:20-bookworm-slim
 
-ENV NODE_ENV=production \
-    PORT=3000 \
+ENV PORT=3000 \
     HOSTNAME=0.0.0.0 \
     NEXT_TELEMETRY_DISABLED=1
 
@@ -51,6 +50,9 @@ RUN npm ci
 # 拷贝源码并构建
 COPY . .
 RUN npm run build
+
+# 仅运行时设为生产环境（构建阶段需要 devDependencies，如 tailwindcss / postcss）
+ENV NODE_ENV=production
 
 # 持久化目录：项目数据、渲染任务、输出 MP4
 VOLUME ["/app/data"]
