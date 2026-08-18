@@ -18,12 +18,14 @@
 
 | 步骤 | 能力 |
 | --- | --- |
-| 1. 需求输入 | 主题、目标时长、风格、受众、语言、画面比例（16:9 / 9:16 / 1:1） |
+| 1. 需求输入 | 主题、目标时长、风格、受众、语言、画面比例（16:9 / 9:16 / 1:1），联网搜索开关（默认开启） |
 | 2. AI 大纲 | 结构化章节/场景（标题、要点、时长占比），卡片式编辑、拖拽排序、增删、单节重新生成 |
 | 3. AI 文稿 | 逐场景旁白/字幕、画面描述、时长，逐场景编辑与单场景重新生成，可选 TTS 配音 |
 | 4. 可视化预览 | Schema（JSON）驱动的 Remotion Composition，在线调节字体/字号/配色/背景/动画/时长/文字，**实时热更新** |
 | 5. 导出 MP4 | 异步任务队列 + 进度反馈，完成后下载，历史记录持久化 |
 | 项目管理 | 状态与五步进度展示、继续上次步骤、删除确认、关联渲染产物清理 |
+
+> 生成大纲/文稿前可**联网检索最新资料**（默认开启），支持 Tavily / Serper / Bocha（博查）三家搜索服务商；未配置搜索服务时自动降级为纯大模型生成。检索结果会注入提示词，并在「大纲/文稿」页展示可核对的参考来源。
 
 ## 二、技术栈
 
@@ -31,6 +33,7 @@
 - **视频框架**：Remotion 4（`remotion` / `@remotion/player` / `@remotion/bundler` / `@remotion/renderer`）
 - **UI**：React 19 + Tailwind CSS 3 + shadcn 风格组件（Radix UI 原语）
 - **大模型接入**：OpenAI 兼容 Chat Completions 协议（`fetch` 直连，无厂商锁定）
+- **联网检索（可选）**：Tavily / Serper / Bocha（博查）搜索 API，生成前检索最新资料
 - **数据持久化**：本地 JSON 文件（`data/` 目录，无需数据库）
 - **TTS（可选）**：OpenAI `audio/speech` 协议
 
@@ -40,12 +43,12 @@
 remotion-ai-studio/
 ├── app/                        # Next.js App Router
 │   ├── page.tsx                # 首页：新建项目 + 项目列表
-│   ├── settings/page.tsx       # 设置：大模型 / TTS 配置 + 连接测试
+│   ├── settings/page.tsx       # 设置：大模型 / TTS / 搜索配置 + 连接测试
 │   ├── project/[id]/page.tsx   # 项目编辑器入口
 │   └── api/                    # 后端 API
 │       ├── projects/           # 项目 CRUD
 │       ├── generate/           # 大纲/文稿生成（含单场景重新生成）
-│       ├── config/             # 配置读写 + 连接测试
+│       ├── config/             # 配置读写 + LLM/TTS/搜索连接测试 + TTS 模型列表
 │       ├── tts/                # 配音合成
 │       └── render/             # 渲染任务队列 + 状态 + 下载
 ├── components/                 # 前端组件（各步骤编辑器、Remotion 播放器封装）
@@ -54,14 +57,18 @@ remotion-ai-studio/
 │   ├── schema-builder.ts       # 文稿 → Remotion Schema 转换
 │   ├── store.ts                # JSON 文件持久化
 │   ├── llm.ts / prompts.ts     # 大模型客户端与提示词
-│   ├── tts.ts                  # TTS 客户端
+│   ├── search.ts               # 联网检索（Tavily/Serper/Bocha）
+│   ├── tts.ts                  # TTS 客户端与连接测试
 │   ├── render-queue.ts         # Remotion 服务端渲染队列
 │   └── api.ts / utils.ts
 ├── remotion/                   # Remotion Composition（Schema 驱动，可复用场景组件）
 │   ├── index.ts / Root.tsx / VideoComposition.tsx
 │   └── scenes/                 # 标题页/要点列表/图文/纯字幕/转场
 ├── docs/                       # 项目设计与维护文档
-│   └── UI-DESIGN.md            # Motion Lab UI 设计规范
+│   ├── UI-DESIGN.md            # Motion Lab UI 设计规范
+│   ├── VIDEO-GENERATION-OPTIMIZATION.md
+│   ├── PROJECT-MANAGEMENT-OPTIMIZATION.md
+│   └── REAL-TIME-SEARCH-OPTIMIZATION.md
 ├── data/                       # 运行时数据（gitignore，自动创建）
 ├── Dockerfile / docker-compose.yml
 └── .env.example
@@ -74,6 +81,8 @@ remotion-ai-studio/
 视频生成效果已升级到 Schema v2：支持逐句字幕、字幕安全区、六种动态版式、语义节拍动画、TTS 真实时长校准和渲染前质量门禁。完整的处理步骤与验证结果见 [视频生成效果优化记录](docs/VIDEO-GENERATION-OPTIMIZATION.md)。
 
 项目管理现已支持真实状态与进度展示、旧项目自动迁移、最后步骤恢复和安全删除。完整处理步骤与验证结果见 [项目管理优化记录](docs/PROJECT-MANAGEMENT-OPTIMIZATION.md)。
+
+联网检索已上线：生成大纲/文稿前可检索最新资料，并新增 LLM/TTS/搜索连接测试与 TTS 模型/音色下拉。完整处理步骤与验证结果见 [联网检索与生成优化记录](docs/REAL-TIME-SEARCH-OPTIMIZATION.md)。
 
 ## 四、本地运行
 
@@ -150,12 +159,28 @@ docker compose up -d --build
 | 启用 | `TTS_ENABLED` | `true` / `false` |
 | Base URL / Key / 模型 / 音色 | `TTS_BASE_URL` / `TTS_API_KEY` / `TTS_MODEL` / `TTS_VOICE` | OpenAI `audio/speech` 协议 |
 
+设置页支持：
+
+- 「测试连接」一键验证 TTS 服务连通性，成功后可直接试听测试音频。
+- 模型与音色支持**下拉选择**，自动从远端 `/v1/models` 解析可用列表（解析失败回退标准 OpenAI 默认列表）。
+
 启用后，在「文稿」步骤可为每个场景（或全部场景）生成旁白配音，配音会合成进最终 MP4。不启用则渲染为纯画面 + 字幕。
+
+### 可选联网搜索
+
+| 配置项 | 环境变量 | 说明 |
+| --- | --- | --- |
+| 启用 | `SEARCH_ENABLED` | `true` / `false` |
+| 服务商 | `SEARCH_PROVIDER` | `tavily` / `serper` / `bocha`（国内网络推荐 `bocha` 或 `serper`） |
+| API Key | `SEARCH_API_KEY` | Tavily: tavily.com；Serper: serper.dev；Bocha 博查: open.bochaai.com |
+| 结果数量 | `SEARCH_MAX_RESULTS` | 1-10，默认 5 |
+
+启用并配置后，生成大纲/文稿前会自动检索主题相关资料并注入提示词；检索失败时自动降级为纯大模型生成。生成结果中的参考来源会展示在「大纲/文稿」页供核对。
 
 ## 七、使用流程
 
 1. 首页填写主题等需求 → 创建项目。
-2. **需求**：确认/修改参数 → 下一步。
+2. **需求**：确认/修改参数（含「联网搜索」开关，默认开启）→ 下一步。
 3. **大纲**：点「生成大纲」→ 拖拽排序、编辑、单节重新生成 → 下一步。
 4. **文稿**：点「生成文稿」→ 逐场景编辑旁白/画面/时长，可单场景重新生成、生成配音 → 下一步（自动把文稿转成 Remotion Schema）。
 5. **预览**：真实播放 Remotion 视频，左侧播放、右侧调主题/场景参数（实时热更新）。
@@ -180,5 +205,7 @@ docker compose up -d --build
 - [x] 项目状态、进度和最后停留步骤持久化，再次进入可直接续作
 - [x] 项目可安全删除，并同步清理关联渲染记录与导出文件
 - [x] 代码结构清晰，含错误处理（LLM 失败、渲染失败、连接测试等）
+- [x] 支持联网检索最新资料（Tavily/Serper/Bocha，默认开启，失败自动降级）
+- [x] LLM / TTS / 搜索均提供连接测试，TTS 支持模型/音色下拉选择
 - [x] README 完整，按文档可复现
 - [x] 统一的 shadcn + Tailwind UI 设计系统，并提供维护规范

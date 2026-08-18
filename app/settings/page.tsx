@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
-import { CheckCircle, FloppyDisk, Key, MagnifyingGlass, PlugsConnected, Robot, SpeakerHigh, WarningCircle } from '@phosphor-icons/react';
+import { ArrowsClockwise, CheckCircle, FloppyDisk, Key, MagnifyingGlass, PlugsConnected, Robot, SpeakerHigh, WarningCircle } from '@phosphor-icons/react';
 import { apiGet, apiPost, apiPut } from '@/lib/api';
 import { AppConfig } from '@/lib/types';
 import { StudioShell } from '@/components/StudioShell';
@@ -22,9 +22,27 @@ export default function SettingsPage() {
   const [testResult, setTestResult] = useState<{ ok: boolean; message: string } | null>(null);
   const [testingSearch, setTestingSearch] = useState(false);
   const [searchTestResult, setSearchTestResult] = useState<{ ok: boolean; message: string } | null>(null);
+  const [testingTts, setTestingTts] = useState(false);
+  const [ttsTestResult, setTtsTestResult] = useState<{ ok: boolean; message: string; audioDataUrl?: string } | null>(null);
+  const [ttsModels, setTtsModels] = useState<string[]>([]);
+  const [ttsVoices, setTtsVoices] = useState<string[]>([]);
+  const [ttsModelsLoading, setTtsModelsLoading] = useState(false);
+
+  const loadTtsOptions = async (baseUrl: string, apiKey: string) => {
+    setTtsModelsLoading(true);
+    try {
+      const data = await apiPost<{ models: string[]; voices: string[] }>('/api/config/tts-models', { baseUrl, apiKey });
+      setTtsModels(data.models);
+      setTtsVoices(data.voices);
+    } catch {
+      /* 获取失败时保留默认列表，不阻断 */
+    } finally {
+      setTtsModelsLoading(false);
+    }
+  };
 
   useEffect(() => {
-    apiGet<{ config: AppConfig }>('/api/config').then((d) => setConfig(d.config)).catch((e) => setError((e as Error).message));
+    apiGet<{ config: AppConfig }>('/api/config').then((d) => { setConfig(d.config); void loadTtsOptions(d.config.tts.baseUrl, d.config.tts.apiKey); }).catch((e) => setError((e as Error).message));
   }, []);
 
   const save = async () => {
@@ -51,6 +69,15 @@ export default function SettingsPage() {
       setSearchTestResult(await apiPost<{ ok: boolean; message: string }>('/api/config/search-test', { provider: config.search.provider, apiKey: config.search.apiKey, maxResults: config.search.maxResults }));
     } catch (e) { setError((e as Error).message); }
     finally { setTestingSearch(false); }
+  };
+
+  const testTts = async () => {
+    if (!config) return;
+    setTestingTts(true); setTtsTestResult(null); setError(null);
+    try {
+      setTtsTestResult(await apiPost<{ ok: boolean; message: string; audioDataUrl?: string }>('/api/config/tts-test', { baseUrl: config.tts.baseUrl, apiKey: config.tts.apiKey, model: config.tts.model, voice: config.tts.voice }));
+    } catch (e) { setError((e as Error).message); }
+    finally { setTestingTts(false); }
   };
 
   if (!config) return <StudioShell active="settings"><div className="flex min-h-[60vh] items-center justify-center gap-3 text-sm text-muted-foreground"><Spinner />加载配置…</div></StudioShell>;
@@ -89,7 +116,21 @@ export default function SettingsPage() {
               <div className="flex items-center justify-between rounded-xl border border-border/15 bg-background/35 px-3 py-2.5"><Label htmlFor="tts-enabled">启用语音服务</Label><span className={`text-xs font-semibold ${config.tts.enabled ? 'text-emerald-200' : 'text-muted-foreground'}`}>{config.tts.enabled ? '已启用' : '未启用'}</span></div>
               <Field label="TTS Base URL"><Input value={config.tts.baseUrl} disabled={!config.tts.enabled} onChange={(e) => setTts({ baseUrl: e.target.value })} /></Field>
               <Field label="TTS API Key"><Input type="password" value={config.tts.apiKey} disabled={!config.tts.enabled} onChange={(e) => setTts({ apiKey: e.target.value })} autoComplete="off" /></Field>
-              <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-1"><Field label="TTS 模型"><Input value={config.tts.model} disabled={!config.tts.enabled} onChange={(e) => setTts({ model: e.target.value })} /></Field><Field label="音色"><Input value={config.tts.voice} disabled={!config.tts.enabled} onChange={(e) => setTts({ voice: e.target.value })} /></Field></div>
+              <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-1">
+                <Field label="TTS 模型">
+                  <NativeSelect value={config.tts.model} disabled={!config.tts.enabled} onChange={(e) => setTts({ model: e.target.value })}>
+                    {(config.tts.model && !ttsModels.includes(config.tts.model) ? [config.tts.model, ...ttsModels] : ttsModels).map((model) => <option key={model} value={model}>{model}</option>)}
+                  </NativeSelect>
+                </Field>
+                <Field label="音色">
+                  <NativeSelect value={config.tts.voice} disabled={!config.tts.enabled} onChange={(e) => setTts({ voice: e.target.value })}>
+                    {(config.tts.voice && !ttsVoices.includes(config.tts.voice) ? [config.tts.voice, ...ttsVoices] : ttsVoices).map((voice) => <option key={voice} value={voice}>{voice}</option>)}
+                  </NativeSelect>
+                </Field>
+              </div>
+              <div className="flex flex-col gap-3 border-t border-border/15 pt-5 sm:flex-row sm:items-center"><Button variant="outline" loading={ttsModelsLoading} disabled={!config.tts.apiKey} onClick={() => void loadTtsOptions(config.tts.baseUrl, config.tts.apiKey)}><ArrowsClockwise className="h-4 w-4" aria-hidden="true" />刷新模型/音色列表</Button></div>
+              <div className="flex flex-col gap-3 border-t border-border/15 pt-5 sm:flex-row sm:items-center"><Button variant="outline" loading={testingTts} disabled={!config.tts.apiKey} onClick={testTts}><PlugsConnected className="h-4 w-4" aria-hidden="true" />测试连接</Button>{ttsTestResult && <div className={`flex items-start gap-2 text-sm ${ttsTestResult.ok ? 'text-emerald-200' : 'text-red-200'}`} role="status">{ttsTestResult.ok ? <CheckCircle className="mt-0.5 h-4 w-4 shrink-0" weight="fill" /> : <WarningCircle className="mt-0.5 h-4 w-4 shrink-0" weight="fill" />}<span>{ttsTestResult.message}</span></div>}</div>
+              {ttsTestResult?.audioDataUrl ? <audio controls src={ttsTestResult.audioDataUrl} className="mt-3 w-full" aria-label="TTS 测试音频" /> : null}
             </CardContent>
           </Card>
           <Card>
