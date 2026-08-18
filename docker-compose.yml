@@ -17,6 +17,11 @@ services:
       TTS_API_KEY: ${TTS_API_KEY:-}
       TTS_MODEL: ${TTS_MODEL:-tts-1}
       TTS_VOICE: ${TTS_VOICE:-alloy}
+      # 可选联网搜索（生成前检索最新资料）
+      SEARCH_ENABLED: ${SEARCH_ENABLED:-false}
+      SEARCH_PROVIDER: ${SEARCH_PROVIDER:-tavily}
+      SEARCH_API_KEY: ${SEARCH_API_KEY:-}
+      SEARCH_MAX_RESULTS: ${SEARCH_MAX_RESULTS:-5}
     volumes:
       - remotion-ai-studio-data:/app/data
     restart: unless-stopped
